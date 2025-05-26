@@ -12,7 +12,7 @@ class AssignmentService {
 
   async processEvent(eventData) {
     const transaction = await sequelize.transaction();
-
+    console.log('Processing event:', eventData);
     try {
       // Check if event already exists
       const existingEvent = await DedupEvent.findOne({
@@ -27,12 +27,13 @@ class AssignmentService {
       }
 
       // Find available user with least assignments
-      const availableUser = await this.findAvailableUser();
-      if (!availableUser) {
-        console.log('No available users found');
-        await transaction.commit();
-        return;
-      }
+      // const availableUser = await this.findAvailableUser();
+      // if (!availableUser) {
+      //   console.log('No available users found');
+      //   await transaction.commit();
+      //   return;
+      // }
+      const availableUser = { userId: 78989, count:1 };
 
       // Create dedup event
       await DedupEvent.create({
@@ -51,21 +52,21 @@ class AssignmentService {
         frameReference: eventData.frameReference
       }, { transaction });
 
-      // Create assignment
+      //Create assignment
       const assignment = await Assignment.create({
         userId: availableUser.userId,
         eventId: eventData.eventId,
         status: 'pending'
       }, { transaction });
 
-      // Create outbox entry
-      await OutboxAssignment.create({
-        assignmentId: assignment.assignmentId,
-        status: 'pending'
-      }, { transaction });
+      // // Create outbox entry
+      // await OutboxAssignment.create({
+      //   assignmentId: assignment.assignmentId,
+      //   status: 'pending'
+      // }, { transaction });
 
       // Increment assignment count in Redis
-      await redis.hincrby('user_assignments', availableUser.userId, 1);
+      //rawait redis.hincrby('user_assignments', availableUser.userId, 1);
 
       await transaction.commit();
       return assignment;
@@ -156,7 +157,7 @@ class AssignmentService {
     try {
       // Get active users from Redis
       const activeUsers = await userSessionService.getActiveUsers();
-      
+
       if (activeUsers.length === 0) {
         logger.info('No active users available for assignment');
         return null;
@@ -180,7 +181,7 @@ class AssignmentService {
       }
 
       // Find user with least assignments
-      const selectedUser = eligibleUsers.reduce((min, user) => 
+      const selectedUser = eligibleUsers.reduce((min, user) =>
         user.count < min.count ? user : min
       );
 
@@ -194,7 +195,7 @@ class AssignmentService {
   async assignEvent(event) {
     try {
       const userId = await this.findEligibleUser();
-      
+
       if (!userId) {
         logger.info(`No eligible user found for event ${event.event_id}`);
         return null;
@@ -212,7 +213,7 @@ class AssignmentService {
 
       const assignedEvent = result[0][0];
       logger.info(`Event ${event.event_id} assigned to user ${userId}`);
-      
+
       return assignedEvent;
     } catch (error) {
       logger.error(`Error assigning event ${event.event_id}:`, error);

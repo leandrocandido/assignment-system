@@ -1,7 +1,6 @@
-const db = require('../config/database');
+const { Event } = require('../models');
 const logger = require('../config/logger');
 const cron = require('node-cron');
-const { Event } = require('../models');
 const { rabbitmq } = require('@relay-service/common');
 const { Op } = require('sequelize');
 
@@ -9,73 +8,71 @@ class EventService {
   constructor() {
     this.isPolling = false;
     this.pollingTask = null;
-    this.cronExpression = process.env.CRON_EXPRESSION || '*/10 * * * * *'; // Default to every 10 seconds
+    this.cronExpression = process.env.CRON_EXPRESSION || '*/15 * * * * *'; // Default to every 30 seconds
   }
 
   async getPendingEvents() {
     try {
-      const result = await db.query(
-        'SELECT * FROM events WHERE state = $1 LIMIT 100',
-        ['Not Viewed']
-      );
-      return result.rows;
+      const events = await Event.findAll({
+        where: {
+          state: 'Not Viewed'
+        },
+        limit: 100,
+        order: [['createdAt', 'ASC']]
+      });
+      return events;
     } catch (error) {
       logger.error('Error fetching pending events:', error);
       throw error;
     }
   }
 
-  // async updateEventState(eventId, state, processingDetails = null) {
-  //   try {
-  //     const result = await db.query(
-  //       'UPDATE events SET state = $1, processing_details = $2, updated_at = NOW() WHERE event_id = $3 RETURNING *',
-  //       [state, processingDetails, eventId]
-  //     );
-  //     return result.rows[0];
-  //   } catch (error) {
-  //     logger.error(`Error updating event state for ID ${eventId}:`, error);
-  //     throw error;
-  //   }
-  // }
+  async updateEventState(eventId, state, processingDetails = null) {
+    try {
+      const [updatedCount, updatedEvents] = await Event.update({
+        state,
+        processingDetails,
+        updatedAt: new Date()
+      }, {
+        where: { eventId },
+        returning: true
+      });
+      return updatedEvents[0];
+    } catch (error) {
+      logger.error(`Error updating event state for ID ${eventId}:`, error);
+      throw error;
+    }
+  }
 
-  // async createEvent(eventData) {
-  //   try {
-  //     const result = await db.query(
-  //       `INSERT INTO events (
-  //         event_id, region, rule_type, location, severity,
-  //         created_at, state, metadata, updated_at
-  //       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW()) RETURNING *`,
-  //       [
-  //         eventData.eventId,
-  //         eventData.region,
-  //         eventData.ruleType,
-  //         eventData.location,
-  //         eventData.severity,
-  //         eventData.createdAt,
-  //         eventData.state,
-  //         eventData.metadata
-  //       ]
-  //     );
-  //     logger.info(`Event created successfully with ID: ${eventData.eventId}`);
-  //     return result.rows[0];
-  //   } catch (error) {
-  //     logger.error('Error creating event:', error);
-  //     throw error;
-  //   }
-  // }
+  async createEvent(eventData) {
+    try {
+      const event = await Event.create({
+        eventId: eventData.eventId,
+        region: eventData.region,
+        ruleType: eventData.ruleType,
+        location: eventData.location,
+        severity: eventData.severity,
+        state: eventData.state,
+        metadata: eventData.metadata,
+        createdAt: eventData.createdAt
+      });
+      logger.info(`Event created successfully with ID: ${eventData.eventId}`);
+      return event;
+    } catch (error) {
+      logger.error('Error creating event:', error);
+      throw error;
+    }
+  }
 
-  // async getEventById(eventId) {
-  //   try {
-  //     const result = await db.query(
-  //       'SELECT * FROM events WHERE event_id = $1',
-  //       [eventId]
-  //     );
-  //     return result.rows[0];
-  //   } catch (error) {
-  //     logger.error(`Error fetching event with ID ${eventId}:`, error);
-  //     throw error;
-  //   }
-  // }
+  async getEventById(eventId) {
+    try {
+      const event = await Event.findByPk(eventId);
+      return event;
+    } catch (error) {
+      logger.error(`Error fetching event with ID ${eventId}:`, error);
+      throw error;
+    }
+  }
 
   async startEventPolling() {
     if (this.isPolling) {
@@ -106,15 +103,17 @@ class EventService {
   async pollAndProcessEvents() {
     try {
       // Find events that haven't been processed yet
-      const events = await Event.findAll({
-        where: {
-          createdAt: {
-            [Op.gte]: new Date(Date.now() - 5 * 60 * 1000) // Last 5 minutes
-          }
-        },
-        order: [['createdAt', 'ASC']],
-        limit: 100
-      });
+      // const events = await Event.findAll({
+      //   where: {
+      //     createdAt: {
+      //       [Op.gte]: new Date(Date.now() - 5 * 60 * 1000) // Last 5 minutes
+      //     }
+      //   },
+      //   order: [['createdAt', 'ASC']],
+      //   limit: 100
+      // });
+
+      const events = await this.getPendingEvents();
 
       if (events.length === 0) {
         return;

@@ -2,6 +2,7 @@ require('dotenv').config();
 const { sequelize } = require('./models');
 const { rabbitmq } = require('@relay-service/common');
 const eventService = require('./services/eventService');
+const schedulerService = require('./services/schedulerService');
 
 async function startServer() {
   try {
@@ -15,6 +16,7 @@ async function startServer() {
 
     // Start event polling
     await eventService.startEventPolling();
+    //await schedulerService.scheduleEventProcessing(process.env.CRON_EXPRESSION);
     console.log('Event polling started');
 
     // Handle shutdown gracefully

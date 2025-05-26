@@ -19,15 +19,34 @@ const Assignment = require('./assignment')(sequelize);
 const DedupEvent = require('./dedupEvent')(sequelize);
 const OutboxAssignment = require('./outboxAssignment')(sequelize);
 
-// Define associations
-Event.hasOne(Assignment);
-Assignment.belongsTo(Event);
+// Define associations based on actual database schema
+Event.hasMany(Assignment, {
+  foreignKey: {
+    name: 'eventId',
+    field: 'event_id'
+  }
+});
 
-DedupEvent.belongsTo(Event);
-Event.hasOne(DedupEvent);
+Assignment.belongsTo(Event, {
+  foreignKey: {
+    name: 'eventId',
+    field: 'event_id'
+  }
+});
 
-OutboxAssignment.belongsTo(Assignment);
-Assignment.hasOne(OutboxAssignment);
+// Assignment.hasMany(OutboxAssignment, {
+//   foreignKey: {
+//     name: 'assignmentId',
+//     field: 'assignment_id'
+//   }
+// });
+
+// OutboxAssignment.belongsTo(Assignment, {
+//   foreignKey: {
+//     name: 'assignmentId',
+//     field: 'assignment_id'
+//   }
+// });
 
 module.exports = {
   sequelize,

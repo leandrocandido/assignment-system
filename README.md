@@ -170,10 +170,26 @@ Body: { "status": "completed" | "rejected" }
 
 ### Local Setup
 
-1. Install dependencies for each service:
+1. Install dependencies for all services and packages:
 ```bash
+# Install root dependencies
+npm install
+
+# Install common package dependencies
+cd common && npm install
+cd ..
+
+# Install scripts dependencies
+cd scripts && npm install
+cd ..
+
+# Install relay service dependencies
 cd services/relay-service && npm install
-cd ../assignment-service && npm install
+cd ../..
+
+# Install assignment service dependencies
+cd services/assignment-service && npm install
+cd ../..
 ```
 
 2. Run services in development mode:

@@ -4,7 +4,8 @@ module.exports = (sequelize) => {
   const Event = sequelize.define('Event', {
     eventId: {
       type: DataTypes.UUID,
-      primaryKey: true
+      primaryKey: true,
+      field: 'event_id'
     },
     region: DataTypes.STRING,
     ruleType: {
@@ -27,11 +28,13 @@ module.exports = (sequelize) => {
     },
     createdAt: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
+      defaultValue: DataTypes.NOW,
+      field: 'created_at'
     },
     updatedAt: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
+      defaultValue: DataTypes.NOW,
+      field: 'updated_at'
     }
   }, {
     tableName: 'events',

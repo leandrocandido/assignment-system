@@ -19,7 +19,7 @@ services:
     environment:
       <<: *common-variables
       POSTGRES_DB: ${POSTGRES_DB_RELAY:-relay_service}
-      CRON_EXPRESSION: ${CRON_EXPRESSION:-"*/10 * * * * *"}
+      CRON_EXPRESSION: ${CRON_EXPRESSION:-"*/15 * * * * *}
     depends_on:
       postgres:
         condition: service_healthy
