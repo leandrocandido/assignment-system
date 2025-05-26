@@ -226,3 +226,99 @@ The initial database schema is automatically created when the containers start u
 ## License
 
 [MIT License](LICENSE)
+
+# Assignment System
+
+This is a microservices-based assignment system that handles events across different regions.
+
+## Services
+
+- **web-app**: Web interface service (Port 3001)
+- **relay-service**: Handles event relay operations
+- **assignment-service**: Manages assignment operations (Port 3000)
+- **postgres**: Database service (Port 5432)
+- **redis**: Session management and caching (Port 6379)
+- **rabbitmq**: Message broker (Port 5672, Management: 15672)
+
+## Getting Started
+
+1. Clone the repository
+2. Make sure you have Docker and Docker Compose installed
+3. Run the services:
+```bash
+docker compose up -d
+```
+
+## API Operations
+
+### Authentication
+
+#### Login
+```bash
+curl -X POST http://localhost:3001/api/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john.doe",
+    "password": "password123"
+  }'
+```
+
+Response will include a userId that you'll need for subsequent requests:
+```json
+{
+  "userId": "1",
+  "username": "john.doe",
+  "name": "John Doe",
+  "role": "supervisor",
+  "region": "US"
+}
+```
+
+#### Logout
+```bash
+curl -X POST http://localhost:3001/api/logout \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: YOUR_USER_ID"
+```
+
+#### Check Session
+```bash
+curl http://localhost:3001/api/session \
+  -H "x-user-id: YOUR_USER_ID"
+```
+
+Note: Replace `YOUR_USER_ID` with the actual userId received from the login response.
+
+### Mock Users
+
+The system comes with 10 pre-configured mock users. Here are some example credentials:
+
+1. Supervisor:
+   - Username: john.doe
+   - Password: password123
+
+2. Regular User:
+   - Username: jane.smith
+   - Password: password123
+
+## Environment Variables
+
+The services use various environment variables that can be configured through `.env` files or docker-compose:
+
+- `PORT`: Web app port (default: 3001)
+- `REDIS_HOST`: Redis host (default: redis)
+- `REDIS_PORT`: Redis port (default: 6379)
+- `SESSION_TTL`: Session time-to-live in seconds (default: 300)
+
+## Development
+
+To run the services in development mode:
+
+```bash
+docker compose up -d
+```
+
+To view logs:
+```bash
+docker compose logs -f [service-name]
+```

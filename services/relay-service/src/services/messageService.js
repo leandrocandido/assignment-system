@@ -2,18 +2,6 @@ const db = require('../config/database');
 const logger = require('../config/logger');
 
 class MessageService {
-  async getPendingMessages() {
-    try {
-      const result = await db.query(
-        'SELECT * FROM messages WHERE status = $1 LIMIT 100',
-        ['PENDING']
-      );
-      return result.rows;
-    } catch (error) {
-      logger.error('Error fetching pending messages:', error);
-      throw error;
-    }
-  }
 
   async updateMessageStatus(messageId, status, processingDetails = null) {
     try {

@@ -17,7 +17,7 @@ class EventService {
         where: {
           state: 'Not Viewed'
         },
-        limit: 100,
+        limit: process.env.EVENT_LIMIT || 10,
         order: [['createdAt', 'ASC']]
       });
       return events;

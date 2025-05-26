@@ -12,6 +12,34 @@ x-common-variables: &common-variables
   RABBITMQ_VHOST: /
 
 services:
+  web-app:
+    build:
+      context: ./services/web-app
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./services/web-app/.env
+    environment:
+      <<: *common-variables
+      NODE_ENV: development
+      PORT: 3001
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SESSION_TTL: 1200
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      relay-service:
+        condition: service_started
+      assignment-service:
+        condition: service_started
+    restart: unless-stopped
+
   relay-service:
     build:
       context: .
@@ -19,7 +47,8 @@ services:
     environment:
       <<: *common-variables
       POSTGRES_DB: ${POSTGRES_DB_RELAY:-relay_service}
-      CRON_EXPRESSION: ${CRON_EXPRESSION:-"*/15 * * * * *}
+      CRON_EXPRESSION: ${CRON_EXPRESSION:-"*/15 * * * * *"}
+      EVENT_LIMIT: ${EVENT_LIMIT:-10}
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,9 +62,14 @@ services:
       dockerfile: services/assignment-service/Dockerfile
     environment:
       <<: *common-variables
+      NODE_ENV: development
       POSTGRES_DB: ${POSTGRES_DB_ASSIGNMENT:-assignment_service}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      SESSION_TTL: 1200
+      MAX_ASSIGNMENTS: 50
+    env_file:
+      - ./services/assignment-service/.env
     ports:
       - "3000:3000"
     depends_on:

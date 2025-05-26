@@ -1,7 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const rabbitmq = require('../../../common/config/rabbitmq');
 const { sequelize } = require('./models');
 const assignmentService = require('./services/assignmentService');
+const redis = require('./config/redis');
 
 const app = express();
 app.use(express.json());
@@ -9,6 +11,47 @@ app.use(express.json());
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Redis test endpoint
+app.get('/redis-test', async (req, res) => {
+  try {
+    const config = {
+      host: process.env.REDIS_HOST,
+      port: process.env.REDIS_PORT,
+      sessionTTL: process.env.SESSION_TTL
+    };
+    
+    // Test Redis connection
+    await redis.ping();
+    
+    res.json({
+      status: 'ok',
+      config,
+      message: 'Redis connection successful'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      config: {
+        host: process.env.REDIS_HOST,
+        port: process.env.REDIS_PORT,
+        sessionTTL: process.env.SESSION_TTL
+      },
+      error: error.message
+    });
+  }
+});
+
+// Assignment count sync endpoint
+app.post('/sync-assignment-counts', async (req, res) => {
+  try {
+    await assignmentService.syncAssignmentCounts();
+    res.json({ status: 'ok', message: 'Assignment counts synced successfully' });
+  } catch (error) {
+    console.error('Error syncing assignment counts:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // User session endpoints
@@ -70,6 +113,14 @@ async function startServer() {
     await sequelize.authenticate();
     console.log('Database connection established');
 
+    // Sync assignment counts on startup
+    try {
+      await assignmentService.syncAssignmentCounts();
+      console.log('Initial assignment count sync completed');
+    } catch (error) {
+      console.error('Error during initial assignment count sync:', error);
+    }
+
     // Start the express server
     const port = process.env.PORT || 3000;
     const server = app.listen(port, () => {
@@ -78,6 +129,16 @@ async function startServer() {
 
     // Setup message consumer
     await setupMessageConsumer();
+
+    // Setup periodic sync (every 5 minutes)
+    setInterval(async () => {
+      try {
+        await assignmentService.syncAssignmentCounts();
+        console.log('Periodic assignment count sync completed');
+      } catch (error) {
+        console.error('Error during periodic assignment count sync:', error);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
 
     // Graceful shutdown
     process.on('SIGTERM', gracefulShutdown);

@@ -4,10 +4,56 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
 const userSessionService = require('./userSessionService');
 
+// Configuration constants
+const DEFAULT_MAX_ASSIGNMENTS = 50;
+const DEFAULT_SESSION_TTL = 300;
+
 class AssignmentService {
-  constructor() {
-    this.MAX_ASSIGNMENTS = 50;
-    this.SESSION_TTL = 300; // 5 minutes in seconds
+  constructor() {   
+    this.MAX_ASSIGNMENTS = parseInt(process.env.MAX_ASSIGNMENTS || DEFAULT_MAX_ASSIGNMENTS);
+    this.SESSION_TTL = parseInt(process.env.SESSION_TTL || DEFAULT_SESSION_TTL);
+    
+    logger.info('AssignmentService Configuration:', {
+      MAX_ASSIGNMENTS: this.MAX_ASSIGNMENTS,
+      SESSION_TTL: this.SESSION_TTL
+    });
+  }
+
+  async syncAssignmentCounts() {
+    try {
+      // Get all users from ever_logged_users set
+      const everLoggedUsers = await redis.smembers('ever_logged_users');
+      if (!everLoggedUsers || everLoggedUsers.length === 0) {
+        logger.info('No users have ever logged in, skipping assignment count sync');
+        return;
+      }
+
+      // For each user, get their pending assignments count from database
+      for (const userId of everLoggedUsers) {
+        const [results] = await sequelize.query(
+          `SELECT COUNT(*) as count 
+           FROM assignments 
+           WHERE user_id = :userId 
+           AND status = 'pending' 
+           AND deleted = false`,
+          {
+            replacements: { userId: parseInt(userId) },
+            type: sequelize.QueryTypes.SELECT
+          }
+        );
+
+        const count = parseInt(results.count);
+        logger.info(`User ${userId} has ${count} pending assignments`);
+
+        // Update Redis hash with the count
+        await redis.hset('user_assignments', userId, count);
+      }
+
+      logger.info('Successfully synced assignment counts to Redis');
+    } catch (error) {
+      logger.error('Error syncing assignment counts:', error);
+      throw error;
+    }
   }
 
   async processEvent(eventData) {
@@ -26,14 +72,14 @@ class AssignmentService {
         return;
       }
 
-      // Find available user with least assignments
-      // const availableUser = await this.findAvailableUser();
-      // if (!availableUser) {
-      //   console.log('No available users found');
-      //   await transaction.commit();
-      //   return;
-      // }
-      const availableUser = { userId: 78989, count:1 };
+      // Get available user from Redis
+      const availableUser = await this.findAvailableUser();
+      
+      if (!availableUser) {
+        console.log('No available users found');
+        await transaction.rollback();
+        return;
+      }
 
       // Create dedup event
       await DedupEvent.create({
@@ -52,23 +98,27 @@ class AssignmentService {
         frameReference: eventData.frameReference
       }, { transaction });
 
-      //Create assignment
+      // Create assignment
       const assignment = await Assignment.create({
         userId: availableUser.userId,
         eventId: eventData.eventId,
         status: 'pending'
       }, { transaction });
 
-      // // Create outbox entry
-      // await OutboxAssignment.create({
-      //   assignmentId: assignment.assignmentId,
-      //   status: 'pending'
-      // }, { transaction });
+      await transaction.commit();
+
 
       // Increment assignment count in Redis
-      //rawait redis.hincrby('user_assignments', availableUser.userId, 1);
+      // Get current session data
+      
+      const userSession = await redis.get(`user:${availableUser.userId}`);
+      if (userSession) {
+        const sessionData = JSON.parse(userSession);
+        sessionData.assignments = (sessionData.assignments || 0) + 1;
+        await redis.set(`user:${availableUser.userId}`, JSON.stringify(sessionData));
+        logger.info(`Incremented assignments count for user ${availableUser.userId} to ${sessionData.assignments}`);
+      }
 
-      await transaction.commit();
       return assignment;
     } catch (error) {
       await transaction.rollback();
@@ -77,28 +127,66 @@ class AssignmentService {
   }
 
   async findAvailableUser() {
-    // Get all active users from Redis
-    const activeUsers = await redis.hgetall('active_users');
-    if (!activeUsers || Object.keys(activeUsers).length === 0) {
+    try {
+      // Get users from ever_logged_users set
+      const everLoggedUsers = await redis.smembers('ever_logged_users');
+      if (!everLoggedUsers || everLoggedUsers.length === 0) {
+        logger.info('No users have ever logged in');
+        return null;
+      }
+
+      logger.info(`Found ${everLoggedUsers.length} users who have logged in before`);
+
+      // Check which users have active sessions
+      const activeUsers = [];
+      for (const userId of everLoggedUsers) {
+        const userKey = `user:${userId}`;
+        const exists = await redis.exists(userKey);
+        if (exists) {
+          activeUsers.push(userId);
+        }
+      }
+
+      if (activeUsers.length === 0) {
+        logger.info('No users with active sessions found');
+        return null;
+      }
+
+      logger.info(`Found ${activeUsers.length} users with active sessions`);
+
+      // Get assignment counts for active users
+      // Get assignment counts from user sessions
+      const sessionAssignmentCounts = await Promise.all(
+        activeUsers.map(async (userId) => {
+          const userSession = await redis.get(`user:${userId}`);
+          let assignments = 0;
+          if (userSession) {
+            try {
+              const sessionData = JSON.parse(userSession);
+              assignments = sessionData.assignments || 0;
+            } catch (error) {
+              logger.error(`Error parsing session data for user ${userId}:`, error);
+            }
+          }
+          return { userId: parseInt(userId), count: assignments };
+        })
+      );
+
+      // Sort users by assignment count
+      sessionAssignmentCounts.sort((a, b) => a.count - b.count);
+
+      // Get user with least assignments from sessions
+      const selectedUser = sessionAssignmentCounts[0];
+      if (selectedUser) {
+        logger.info(`User ${selectedUser.userId} has least assignments: ${selectedUser.coount}`);
+      }
+
+      return selectedUser;
+
+    } catch (error) {
+      logger.error('Error finding available user:', error);
       return null;
     }
-
-    // Get assignment counts for all users
-    const assignmentCounts = await redis.hgetall('user_assignments');
-
-    // Find user with least assignments
-    let selectedUser = null;
-    let minAssignments = this.MAX_ASSIGNMENTS;
-
-    for (const userId of Object.keys(activeUsers)) {
-      const count = parseInt(assignmentCounts[userId] || '0');
-      if (count < minAssignments) {
-        selectedUser = { userId: parseInt(userId), count };
-        minAssignments = count;
-      }
-    }
-
-    return selectedUser;
   }
 
   async updateAssignment(assignmentId, status) {
@@ -172,7 +260,7 @@ class AssignmentService {
       );
 
       // Filter users who haven't reached the maximum assignments
-      const maxAssignments = parseInt(process.env.MAX_ASSIGNMENTS_PER_USER) || 50;
+      const maxAssignments = parseInt(process.env.MAX_ASSIGNMENTS) || 50;
       const eligibleUsers = assignmentCounts.filter(user => user.count < maxAssignments);
 
       if (eligibleUsers.length === 0) {
