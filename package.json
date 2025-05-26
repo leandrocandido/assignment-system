@@ -1,0 +1,15 @@
+{
+  "name": "event-processing-system",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "common",
+    "services/*"
+  ],
+  "scripts": {
+    "start:relay": "cd services/relay-service && npm start",
+    "start:assignment": "cd services/assignment-service && npm start",
+    "dev:relay": "cd services/relay-service && npm run dev",
+    "dev:assignment": "cd services/assignment-service && npm run dev"
+  }
+} 

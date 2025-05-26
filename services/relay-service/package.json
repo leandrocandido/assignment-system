@@ -1,0 +1,21 @@
+{
+  "name": "relay-service",
+  "version": "1.0.0",
+  "description": "Service for relaying events",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "@relay-service/common": "1.0.0",
+    "amqplib": "^0.10.3",
+    "dotenv": "^16.3.1",
+    "node-cron": "^3.0.3",
+    "pg": "^8.11.3",
+    "sequelize": "^6.35.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+} 

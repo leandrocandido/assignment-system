@@ -1,0 +1,10 @@
+{
+  "name": "@relay-service/common",
+  "version": "1.0.0",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "winston": "^3.11.0"
+  }
+} 
