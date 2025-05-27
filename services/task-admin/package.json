@@ -1,0 +1,17 @@
+{
+  "name": "task-admin",
+  "version": "1.0.0",
+  "description": "Task Admin Service for managing background jobs",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "node-cron": "^3.0.0",
+    "winston": "^3.8.2",
+    "dotenv": "^16.0.3",
+    "ioredis": "^5.3.2",
+    "pg": "^8.11.0"
+  }
+} 

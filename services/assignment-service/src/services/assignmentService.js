@@ -86,18 +86,25 @@ class AssignmentService {
         eventId: eventData.eventId
       }, { transaction });
 
-      // Create event
-      await Event.create({
-        eventId: eventData.eventId,
-        region: eventData.region,
-        ruleType: eventData.ruleType,
-        location: eventData.location,
-        severity: eventData.severity,
-        deviceId: eventData.deviceId,
-        cameraId: eventData.cameraId,
-        frameReference: eventData.frameReference
-      }, { transaction });
+      // Check if event exists in events table
+      const existingEventRecord = await Event.findOne({
+        where: { eventId: eventData.eventId },
+        transaction
+      });
 
+      // Only create event if it doesn't exist
+      if (!existingEventRecord) {
+        await Event.create({
+          eventId: eventData.eventId,
+          region: eventData.region,
+          ruleType: eventData.ruleType,
+          location: eventData.location,
+          severity: eventData.severity,
+          deviceId: eventData.deviceId,
+          cameraId: eventData.cameraId,
+          frameReference: eventData.frameReference
+        }, { transaction });
+      }     
       // Create assignment
       const assignment = await Assignment.create({
         userId: availableUser.userId,
