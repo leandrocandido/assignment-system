@@ -1,4 +1,5 @@
 const amqp = require('amqplib');
+require('dotenv').config();
 
 class RabbitMQClient {
   constructor() {
@@ -60,8 +61,8 @@ class RabbitMQClient {
 
   async setupQueues() {
     // Ensure queues exist
-    await this.channel.assertQueue('event_assignments', { durable: true });
-    await this.channel.assertQueue('assignment_updates', { durable: true });
+    await this.channel.assertQueue(process.env.OUTBOUND_QUEUE, { durable: true });
+    await this.channel.assertQueue(process.env.INBOUND_QUEUE, { durable: true });
   }
 
   async publishMessage(queue, message) {

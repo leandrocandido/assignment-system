@@ -43,16 +43,6 @@ app.get('/redis-test', async (req, res) => {
   }
 });
 
-// Assignment count sync endpoint
-app.post('/sync-assignment-counts', async (req, res) => {
-  try {
-    await assignmentService.syncAssignmentCounts();
-    res.json({ status: 'ok', message: 'Assignment counts synced successfully' });
-  } catch (error) {
-    console.error('Error syncing assignment counts:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // User session endpoints
 app.post('/users/:userId/active', async (req, res) => {
@@ -75,27 +65,12 @@ app.delete('/users/:userId/active', async (req, res) => {
   }
 });
 
-// Assignment endpoints
-app.put('/assignments/:assignmentId', async (req, res) => {
-  try {
-    const { status } = req.body;
-    const assignment = await assignmentService.updateAssignment(
-      req.params.assignmentId,
-      status
-    );
-    res.json(assignment);
-  } catch (error) {
-    console.error('Error updating assignment:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 async function setupMessageConsumer() {
   try {
     await rabbitmq.connect();
 
-    // Consume events from the event_assignments queue with prefetch=1
-    await rabbitmq.consumeMessages('event_assignments', async (eventData) => {
+    await rabbitmq.consumeMessages(process.env.OUTBOUND_QUEUE, async (eventData) => {
       await assignmentService.processEvent(eventData);
     }, { prefetch: 1, requeue: false });
 

@@ -46,7 +46,21 @@ class AssignmentService {
         logger.info(`User ${userId} has ${count} pending assignments`);
 
         // Update Redis hash with the count
-        await redis.hset('user_assignments', userId, count);
+        
+        const userSession = await redis.get(`user:${userId}`);
+        if (userSession) {
+          const sessionData = JSON.parse(userSession);
+          sessionData.assignments = count;
+          await redis.setex(
+            `user:${userId}`,
+            process.env.SESSION_TTL,
+            JSON.stringify(sessionData)
+          );
+          
+          logger.info(`Syncronized the value in cachefor user ${userId} to ${sessionData.assignments}`);
+        }
+
+        //await redis.hset('user_assignments', userId, count);
       }
 
       logger.info('Successfully synced assignment counts to Redis');
@@ -161,8 +175,7 @@ class AssignmentService {
 
       logger.info(`Found ${activeUsers.length} users with active sessions`);
 
-      // Get assignment counts for active users
-      // Get assignment counts from user sessions
+      // Get assignment counts for active users      
       const sessionAssignmentCounts = await Promise.all(
         activeUsers.map(async (userId) => {
           const userSession = await redis.get(`user:${userId}`);
@@ -193,36 +206,6 @@ class AssignmentService {
     } catch (error) {
       logger.error('Error finding available user:', error);
       return null;
-    }
-  }
-
-  async updateAssignment(assignmentId, status) {
-    const transaction = await sequelize.transaction();
-
-    try {
-      const assignment = await Assignment.findByPk(assignmentId, { transaction });
-      if (!assignment) {
-        throw new Error(`Assignment ${assignmentId} not found`);
-      }
-
-      assignment.status = status;
-      await assignment.save({ transaction });
-
-      await OutboxAssignment.create({
-        assignmentId: assignment.assignmentId,
-        status
-      }, { transaction });
-
-      if (status === 'completed' || status === 'rejected') {
-        // Decrement assignment count in Redis
-        await redis.hincrby('user_assignments', assignment.userId, -1);
-      }
-
-      await transaction.commit();
-      return assignment;
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
     }
   }
 

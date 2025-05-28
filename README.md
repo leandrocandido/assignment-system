@@ -164,7 +164,7 @@ Body: { "status": "completed" | "rejected" }
 - Port: 6379
 - Key Patterns:
   - active_users: Hash of active user IDs
-  - user_assignments: Hash of assignment counts per user
+  - ever_logged_users: Hash of assignment counts per user
 
 ## Development
 

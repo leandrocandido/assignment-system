@@ -47,6 +47,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB_RELAY:-relay_service}
       CRON_EXPRESSION: ${CRON_EXPRESSION:-"*/15 * * * * *"}
       EVENT_LIMIT: ${EVENT_LIMIT:-10}
+      OUTBOUND_QUEUE: ${OUTBOUND_QUEUE:-events.outbound}
+      INBOUND_QUEUE: ${INBOUND_QUEUE:-events.inbound}
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,6 +65,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB_ASSIGNMENT:-assignment_service}
       SESSION_TTL: ${SESSION_TTL:-1200}
       MAX_ASSIGNMENTS: ${MAX_ASSIGNMENTS:-50}
+      OUTBOUND_QUEUE: ${OUTBOUND_QUEUE:-events.outbound}
+      INBOUND_QUEUE: ${INBOUND_QUEUE:-events.inbound}
     ports:
       - "${ASSIGNMENT_SERVICE_PORT:-3000}:3000"
     depends_on:
