@@ -40,8 +40,8 @@ services:
 
   relay-service:
     build:
-      context: .
-      dockerfile: services/relay-service/Dockerfile
+      context: ./services/relay-service
+      dockerfile: Dockerfile
     environment:
       <<: *common-variables
       POSTGRES_DB: ${POSTGRES_DB_RELAY:-relay_service}
@@ -86,7 +86,8 @@ services:
         condition: service_healthy
     profiles:
       - tools
-    command: ["node", "generateEvents.js"]
+    entrypoint: ["node", "generateEvents.js"]
+    command: ["0"]
 
   postgres:
     image: postgres:15-alpine

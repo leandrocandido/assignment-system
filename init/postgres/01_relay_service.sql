@@ -3,24 +3,23 @@
 
 -- Create events table
 CREATE TABLE IF NOT EXISTS events (
-    id SERIAL,
     event_id UUID PRIMARY KEY,
     region VARCHAR(100) NOT NULL,
-    rule_type VARCHAR(100) NOT NULL,
-    location VARCHAR(255),
-    severity INTEGER NOT NULL,
-    device_id VARCHAR(100),
-    camera_id VARCHAR(100),
-    frame_reference VARCHAR(255),
-    state VARCHAR(50) NOT NULL DEFAULT 'Not Viewed',
+    device_id VARCHAR(100) NOT NULL,
+    camera_id VARCHAR(100) NOT NULL,
+    rule_type VARCHAR(50) NOT NULL,
+    severity INTEGER NOT NULL CHECK (severity >= 1 AND severity <= 5),
+    location VARCHAR(255) NOT NULL,
+    frame_reference VARCHAR(255) NOT NULL,
+    processed BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
-CREATE INDEX IF NOT EXISTS idx_events_state ON events(state);
-CREATE INDEX IF NOT EXISTS idx_events_rule_type ON events(rule_type);
+CREATE INDEX IF NOT EXISTS idx_events_processed ON events(processed);
+CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

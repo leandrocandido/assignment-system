@@ -1,21 +1,25 @@
-FROM node:18-alpine
+FROM node:16-alpine
 
 WORKDIR /app
 
-# Copy workspace configuration
-COPY package.json ./
-COPY common/package.json ./common/
-COPY services/relay-service/package.json ./services/relay-service/
+# Copy package files
+COPY package*.json ./
 
-# Install dependencies using workspaces
-RUN npm install --workspace=relay-service --include-workspace-root --production
+# Install production dependencies only
+RUN npm install --only=production
 
 # Copy source code
-COPY common ./common/
-COPY services/relay-service/src ./services/relay-service/src/
+COPY . .
 
-WORKDIR /app/services/relay-service
+# Install dev dependencies for TypeScript compilation
+RUN npm install --no-save typescript
 
-EXPOSE 3000
+# Build TypeScript
+RUN npm run build
 
-CMD ["npm", "start"] 
+# Start the service
+CMD ["npm", "start"]
+
+# Add an alternative command for event generation
+# Usage: docker compose run --rm event-generator <number_of_events>
+#ENTRYPOINT ["node", "dist/scripts/generateEvents.js"] 
