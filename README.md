@@ -229,96 +229,172 @@ The initial database schema is automatically created when the containers start u
 
 # Assignment System
 
-This is a microservices-based assignment system that handles events across different regions.
+This system provides an integrated solution for managing assignments and events across multiple services. It includes a web interface for user interaction and background services for task management.
 
-## Services
+## Architecture Overview
 
-- **web-app**: Web interface service (Port 3001)
-- **relay-service**: Handles event relay operations
-- **assignment-service**: Manages assignment operations (Port 3000)
-- **postgres**: Database service (Port 5432)
-- **redis**: Session management and caching (Port 6379)
-- **rabbitmq**: Message broker (Port 5672, Management: 15672)
+The system consists of multiple microservices:
+
+- Web App (Port 3001)
+- Assignment Service (Port 3000)
+- Task Admin Service
+- Relay Service
+
+### Infrastructure Components
+
+- PostgreSQL (Port 5432)
+- Redis (Port 6379)
+- RabbitMQ (Port 5672, Management: 15672)
+
+## Services Details
+
+### Web App (Port 3001)
+
+The web application is provided by Protext AI, embedded as a Docker container in our solution. We've enhanced it with:
+
+- User authentication system
+- Login form with session management
+- Real-time assignment status updates
+
+To access the web interface:
+```
+http://localhost:3001
+```
+
+Default credentials:
+- Username: supervisor
+- Password: supervisor123
+
+### Task Admin Service
+
+The Task Admin service manages background jobs and processes messages from various queues.
+
+#### Jobs
+
+1. **Inactive User Job**
+   - Runs: Daily at midnight
+   - Purpose: Cleans up assignments for inactive users
+   - Actions: 
+     - Marks assignments as deleted
+     - Removes events from dedup_events
+     - Updates Redis user tracking
+
+2. **Expired Event Job**
+   - Runs: Every 2 hours
+   - Purpose: Handles expired assignments
+   - Actions:
+     - Processes assignments older than 15 minutes
+     - Updates user assignment counts in Redis
+
+3. **Check Reviewed Job**
+   - Runs: Every 30 minutes
+   - Purpose: Processes completed assignments
+   - Actions:
+     - Identifies non-pending assignments
+     - Creates outbox entries
+     - Produces messages to events.inbound queue
+
+#### Message Queue Processing
+
+**Consumes:**
+- ack.queue
+  - Purpose: Updates assignment status after event processing
+  - Actions: Updates outbox_assignments status to 'finished'
+
+**Produces:**
+- events.inbound
+  - Content: { assignmentId, eventId }
+  - Purpose: Notifies about completed assignments
+
+#### Folder Structure
+```
+services/task-admin/
+├── src/
+│   ├── jobs/
+│   │   ├── checkReviewedJob.js
+│   │   ├── expiredEventJob.js
+│   │   └── inactiveUserJob.js
+│   ├── consumers/
+│   │   └── ackQueueConsumer.js
+│   ├── utils/
+│   │   └── logger.js
+│   └── index.js
+├── Dockerfile
+└── package.json
+```
+
+### Relay Service
+
+The Relay service handles event processing and status updates.
+
+#### Message Queue Processing
+
+**Consumes:**
+- events.inbound
+  - Purpose: Processes completed assignments
+  - Actions: 
+    - Updates event state to 'viewed'
+    - Forwards to ack.queue
+
+**Produces:**
+- ack.queue
+  - Content: { assignmentId, eventId }
+  - Purpose: Confirms event processing
 
 ## Getting Started
 
-1. Clone the repository
-2. Make sure you have Docker and Docker Compose installed
-3. Run the services:
+1. Clone the repository:
 ```bash
-docker compose up -d
+git clone <repository-url>
 ```
 
-## API Operations
+2. Create necessary .env files (examples provided in .env.example)
 
-### Authentication
-
-#### Login
+3. Start the services:
 ```bash
-curl -X POST http://localhost:3001/api/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "john.doe",
-    "password": "password123"
-  }'
+docker-compose up -d
 ```
 
-Response will include a userId that you'll need for subsequent requests:
-```json
-{
-  "userId": "1",
-  "username": "john.doe",
-  "name": "John Doe",
-  "role": "supervisor",
-  "region": "US"
-}
+4. Access the web interface:
 ```
-
-#### Logout
-```bash
-curl -X POST http://localhost:3001/api/logout \
-  -H "Content-Type: application/json" \
-  -H "x-user-id: YOUR_USER_ID"
+http://localhost:3001
 ```
-
-#### Check Session
-```bash
-curl http://localhost:3001/api/session \
-  -H "x-user-id: YOUR_USER_ID"
-```
-
-Note: Replace `YOUR_USER_ID` with the actual userId received from the login response.
-
-### Mock Users
-
-The system comes with 10 pre-configured mock users. Here are some example credentials:
-
-1. Supervisor:
-   - Username: john.doe
-   - Password: password123
-
-2. Regular User:
-   - Username: jane.smith
-   - Password: password123
 
 ## Environment Variables
 
-The services use various environment variables that can be configured through `.env` files or docker-compose:
+Each service has its own environment variables. Key variables include:
 
-- `PORT`: Web app port (default: 3001)
-- `REDIS_HOST`: Redis host (default: redis)
-- `REDIS_PORT`: Redis port (default: 6379)
-- `SESSION_TTL`: Session time-to-live in seconds (default: 300)
+```env
+# Database
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=assignment_service
+
+# Redis
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# RabbitMQ
+RABBITMQ_URL=amqp://rabbitmq:5672
+
+# Job Schedules
+INACTIVE_USER_CRON="0 0 * * *"
+EXPIRED_EVENT_CRON="0 */2 * * *"
+CHECK_REVIEWED_CRON="*/30 * * * *"
+```
+
+## Monitoring
+
+- RabbitMQ Management: http://localhost:15672
+  - Username: guest
+  - Password: guest
 
 ## Development
 
-To run the services in development mode:
+To run services individually for development:
 
 ```bash
-docker compose up -d
-```
-
-To view logs:
-```bash
-docker compose logs -f [service-name]
+cd services/<service-name>
+npm install
+npm run dev
 ```
