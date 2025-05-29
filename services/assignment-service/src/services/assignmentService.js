@@ -122,7 +122,13 @@ class AssignmentService {
       if (userSession) {
         const sessionData = JSON.parse(userSession);
         sessionData.assignments = (sessionData.assignments || 0) + 1;
-        await redis.set(`user:${availableUser.userId}`, JSON.stringify(sessionData));
+
+        await redis.setex(
+          `user:${availableUser.userId}`,
+          process.env.SESSION_TTL,
+          JSON.stringify(sessionData)
+        );
+
         logger.info(`Incremented assignments count for user ${availableUser.userId} to ${sessionData.assignments}`);
       }
 
@@ -185,7 +191,7 @@ class AssignmentService {
       // Get user with least assignments from sessions
       const selectedUser = sessionAssignmentCounts[0];
       if (selectedUser) {
-        logger.info(`User ${selectedUser.userId} has least assignments: ${selectedUser.coount}`);
+        logger.info(`User ${selectedUser.userId} has least assignments: ${selectedUser.count}`);
       }
 
       return selectedUser;
