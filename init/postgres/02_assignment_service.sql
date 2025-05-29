@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS assignments (
     assignment_id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,
     event_id UUID NOT NULL REFERENCES events(event_id),
-    status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'assigned', 'completed', 'rejected')),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
     deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS dedup_events (
 CREATE TABLE IF NOT EXISTS outbox_assignments (
     id SERIAL PRIMARY KEY,
     assignment_id INTEGER NOT NULL,
-    status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'assigned', 'completed', 'rejected')),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('completed', 'finished')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

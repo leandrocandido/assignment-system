@@ -4,6 +4,7 @@ const logger = require('./utils/logger');
 const inactiveUserJob = require('./jobs/inactiveUserJob');
 const expiredEventJob = require('./jobs/expiredEventJob');
 const checkReviewedJob = require('./jobs/checkReviewedJob');
+const ackQueueConsumer = require('./consumers/ackQueueConsumer');
 
 // Default cron expressions if not provided in environment variables
 const DEFAULT_CRON_EXPRESSIONS = {
@@ -49,10 +50,22 @@ function initializeJobs() {
     jobs.forEach(({ job, cronExp }) => scheduleJob(job, cronExp));
 }
 
+// Start message consumers
+async function startConsumers() {
+    try {
+        await ackQueueConsumer.start();
+        logger.info('Ack queue consumer started successfully');
+    } catch (error) {
+        logger.error('Failed to start ack queue consumer:', error);
+        // Don't exit the process as the consumer has its own retry mechanism
+    }
+}
+
 // Start the application
-function start() {
+async function start() {
     logger.info('TaskAdmin service starting...');
     initializeJobs();
+    await startConsumers();
     logger.info('TaskAdmin service started successfully');
 }
 

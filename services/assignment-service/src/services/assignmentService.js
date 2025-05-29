@@ -186,10 +186,11 @@ class AssignmentService {
       );
 
       // Sort users by assignment count
-      sessionAssignmentCounts.sort((a, b) => a.count - b.count);
+      const eligibleUsers = sessionAssignmentCounts.filter(user => user.count < process.env.MAX_ASSIGNMENTS );
+      eligibleUsers.sort((a, b) => a.count - b.count);
 
       // Get user with least assignments from sessions
-      const selectedUser = sessionAssignmentCounts[0];
+      const selectedUser = eligibleUsers[0];
       if (selectedUser) {
         logger.info(`User ${selectedUser.userId} has least assignments: ${selectedUser.count}`);
       }
@@ -293,34 +294,6 @@ class AssignmentService {
     }
   }
 
-  async assignEvent(event) {
-    try {
-      const userId = await this.findEligibleUser();
-
-      if (!userId) {
-        logger.info(`No eligible user found for event ${event.event_id}`);
-        return null;
-      }
-
-      const result = await sequelize.query(
-        `UPDATE events 
-         SET assigned_to = $1, 
-             assigned_at = NOW(),
-             state = 'Processing'
-         WHERE event_id = $2
-         RETURNING *`,
-        { replacements: [userId, event.event_id], type: sequelize.QueryTypes.UPDATE }
-      );
-
-      const assignedEvent = result[0][0];
-      logger.info(`Event ${event.event_id} assigned to user ${userId}`);
-
-      return assignedEvent;
-    } catch (error) {
-      logger.error(`Error assigning event ${event.event_id}:`, error);
-      throw error;
-    }
-  }
 
   async getUserAssignments(userId) {
     try {
