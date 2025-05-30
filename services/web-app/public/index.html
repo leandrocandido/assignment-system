@@ -200,10 +200,10 @@
             right: 20px;
         }
 
-        .main-content {
+        /* .main-content {
             padding: 80px 20px 20px 20px;
             text-align: center;
-        }
+        } */
 
         .toast {
             position: fixed;
@@ -293,7 +293,11 @@
         // Global variables
         let loginModal;
         let toast;
-        let currentUser = null;
+        let currentUserId = null;
+        let fetchInterval = null;
+        let currentRegion = null;
+        let currentLocation = null;
+        let allEvents = [];  // Store all events globally
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
@@ -322,6 +326,7 @@
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
 
+            console.log('Attempting login for username:', username);
             try {
                 const response = await fetch('/api/login', {
                     method: 'POST',
@@ -331,38 +336,56 @@
                     body: JSON.stringify({ username, password })
                 });
 
-                const data = await response.json();
-
-                if (response.ok) {
-                    currentUser = data;
-                    updateUIForUser(data);
-                    loginModal.hide();
-                    showToast(`Welcome, ${data.name}!`);
-                    fetchEvents();
-                } else {
-                    showToast(data.error || 'Login failed', true);
+                console.log('Login response status:', response.status);
+                if (!response.ok) {
+                    throw new Error('Login failed');
                 }
+
+                const userData = await response.json();
+                console.log('Login successful. User data:', userData);
+                currentUserId = userData.id;
+                console.log('Set currentUserId to:', currentUserId);
+                
+                // Update UI
+                document.querySelector('#loginButton .user-info').style.display = 'flex';
+                document.querySelector('#loginButton .user-info .user-name').textContent = userData.name;
+                document.querySelector('#loginButton button').style.display = 'none';
+
+                // Close the modal
+                loginModal.hide();
+
+                // Start periodic event fetching
+                startEventFetching();
+
+                showToast(`Welcome, ${userData.name}!`);
             } catch (error) {
+                console.error('Login error:', error);
                 showToast('An error occurred during login', true);
             }
         }
 
         async function logout() {
-            if (!currentUser) return;
-
             try {
-                const response = await fetch('/api/logout', {
+                await fetch('/api/logout', {
                     method: 'POST',
                     headers: {
-                        'x-user-id': currentUser.id
+                        'Content-Type': 'application/json'
                     }
                 });
 
-                if (response.ok) {
-                    updateUIForLogout();
-                    showToast('Logged out successfully');
-                    fetchEvents();
+                // Stop event fetching
+                if (fetchInterval) {
+                    clearInterval(fetchInterval);
+                    fetchInterval = null;
                 }
+
+                // Reset UI
+                currentUserId = null;
+                document.querySelector('#loginButton .user-info').style.display = 'none';
+                document.querySelector('#loginButton button').style.display = 'block';
+                document.querySelector('#events-container').innerHTML = '';
+                
+                showToast('Logged out successfully');
             } catch (error) {
                 showToast('An error occurred during logout', true);
             }
@@ -381,7 +404,7 @@
 
                 if (response.ok) {
                     const data = await response.json();
-                    currentUser = data;
+                    currentUserId = data.id;
                     updateUIForUser(data);
                 } else {
                     localStorage.removeItem('userId');
@@ -403,7 +426,7 @@
             document.querySelector('.user-info').style.display = 'none';
             document.querySelector('.user-name').textContent = '';
             localStorage.removeItem('userId');
-            currentUser = null;
+            currentUserId = null;
         }
 
         // Connect to Socket.io
@@ -415,12 +438,6 @@
         const totalCountEl = document.getElementById('total-count');
         const pendingCountEl = document.getElementById('pending-count');
         const lastUpdateEl = document.getElementById('last-update');
-        
-        // Current state
-        let allEvents = {};
-        let activeTile = null;
-        let currentRegion = null;
-        let currentLocation = null;
         
         // Fetch all events initially
         fetchEvents();
@@ -445,60 +462,88 @@
         });
         
         // Fetch events from the API
-        function fetchEvents() {
-            fetch('/api/events')
-                .then(response => response.json())
-                .then(data => {
-                    allEvents = data;
-                    renderRegionTiles();
-                    if (currentRegion && currentLocation) {
-                        renderEvents();
-                    }
-                    updateCounts();
-                    lastUpdateEl.textContent = new Date().toLocaleTimeString();
-                })
-                .catch(error => {
-                    console.error('Error fetching events:', error);
-                });
-        }
-        
-        // Render region and site tiles in the sidebar
-        function renderRegionTiles() {
-            sidebar.innerHTML = '';
-            
-            // Process events to group by region and location
-            const groupedEvents = {};
-            
-            for (const region in allEvents) {
-                if (!groupedEvents[region]) {
-                    groupedEvents[region] = {};
-                }
+        async function fetchEvents() {
+            if (!currentUserId) {
+                console.log('No currentUserId, skipping fetch');
+                return;
+            }
+
+            console.log('Fetching events for userId:', currentUserId);
+            try {
+                const url = `/api/events?userId=${currentUserId}`;
+                console.log('Fetching from URL:', url);
                 
-                allEvents[region].forEach(event => {
-                    const location = event.location;
-                    if (!groupedEvents[region][location]) {
-                        groupedEvents[region][location] = {
+                const response = await fetch(url);
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch events: ${response.status} ${response.statusText}`);
+                }
+
+                const events = await response.json();
+                console.log('Events fetched successfully:', events);
+                
+                // Ensure we have an array of events
+                if (!Array.isArray(events)) {
+                    console.error('Expected array of events, got:', typeof events);
+                    updateEventsDisplay([]);
+                    updateStatusBar([]);
+                    return;
+                }
+
+                // Store events globally
+                allEvents = events;
+
+                // Group events by region and location for the sidebar
+                const groupedEvents = events.reduce((acc, event) => {
+                    if (!acc[event.region]) {
+                        acc[event.region] = {};
+                    }
+                    if (!acc[event.region][event.location]) {
+                        acc[event.region][event.location] = {
                             total: 0,
                             pending: 0
                         };
                     }
-                    
-                    groupedEvents[region][location].total++;
-                    if (event.state === 'Not Viewed') {
-                        groupedEvents[region][location].pending++;
+                    acc[event.region][event.location].total++;
+                    if (event.assignment_status === 'pending') {
+                        acc[event.region][event.location].pending++;
                     }
-                });
+                    return acc;
+                }, {});
+
+                // Update the UI
+                updateSidebar(groupedEvents);
+                
+                // If a region is selected, show filtered events, otherwise show all
+                if (currentRegion && currentLocation) {
+                    const filteredEvents = events.filter(e => 
+                        e.region === currentRegion && e.location === currentLocation
+                    );
+                    updateEventsDisplay(filteredEvents);
+                } else {
+                    updateEventsDisplay(events);
+                }
+                
+                updateStatusBar(events);
+            } catch (error) {
+                console.error('Error fetching events:', error);
+                updateEventsDisplay([]);
+                updateStatusBar([]);
             }
+        }
+        
+        function updateSidebar(groupedEvents) {
+            const sidebar = document.querySelector('#sidebar');
+            if (!sidebar) return;
+
+            sidebar.innerHTML = '';
             
-            // Create tiles for each region/location
-            for (const region in groupedEvents) {
-                for (const location in groupedEvents[region]) {
-                    const counts = groupedEvents[region][location];
-                    
+            Object.entries(groupedEvents).forEach(([region, locations]) => {
+                Object.entries(locations).forEach(([location, counts]) => {
                     const tile = document.createElement('div');
                     tile.className = 'region-tile';
                     
-                    // Set active class if this is the selected tile
                     if (currentRegion === region && currentLocation === location) {
                         tile.classList.add('active');
                     }
@@ -513,144 +558,128 @@
                     `;
                     
                     tile.addEventListener('click', () => {
-                        // Clear previous active tile
-                        if (activeTile) {
-                            activeTile.classList.remove('active');
-                        }
-                        
-                        // Set this tile as active
+                        // Update active state
+                        document.querySelectorAll('.region-tile').forEach(t => t.classList.remove('active'));
                         tile.classList.add('active');
-                        activeTile = tile;
                         
                         // Update current selection
                         currentRegion = region;
                         currentLocation = location;
                         
-                        // Render events for this selection
-                        renderEvents();
+                        // Filter and display events
+                        const filteredEvents = allEvents.filter(e => 
+                            e.region === region && e.location === location
+                        );
+                        console.log(`Filtering events for ${region}/${location}:`, filteredEvents);
+                        updateEventsDisplay(filteredEvents);
                     });
                     
                     sidebar.appendChild(tile);
-                }
-            }
+                });
+            });
             
-            // Show message if no regions/sites
             if (sidebar.children.length === 0) {
                 sidebar.innerHTML = '<div class="loading">No regions/sites found</div>';
             }
         }
-        
-        // Render events for selected region and location
-        function renderEvents() {
-            eventsContainer.innerHTML = '';
-            
-            if (!currentRegion || !currentLocation) {
-                eventsContainer.innerHTML = '<div class="no-selection">Select a region/site from the left to view events</div>';
+
+        function updateEventsDisplay(events) {
+            const container = document.querySelector('#events-container');
+            if (!container) {
+                console.error('Events container not found');
                 return;
             }
-            
-            // Filter events by current region and location
-            const events = allEvents[currentRegion]?.filter(event => event.location === currentLocation) || [];
-            
+
+            if (!Array.isArray(events)) {
+                console.error('Expected array of events, got:', typeof events);
+                events = [];
+            }
+
             if (events.length === 0) {
-                eventsContainer.innerHTML = '<div class="loading">No events found for this region/site</div>';
+                container.innerHTML = '<div class="no-events">No events found for this selection</div>';
                 return;
             }
-            
-            // Sort events: pending first, then newest to oldest
-            events.sort((a, b) => {
-                // First sort by state (Not Viewed first)
-                if (a.state === 'Not Viewed' && b.state !== 'Not Viewed') return -1;
-                if (a.state !== 'Not Viewed' && b.state === 'Not Viewed') return 1;
-                
-                // Then sort by date (newest first)
-                return new Date(b.createdAt) - new Date(a.createdAt);
-            });
-            
-            // Render each event
-            events.forEach(event => {
-                const eventCard = document.createElement('div');
-                eventCard.className = `event-card ${event.state.toLowerCase().replace(' ', '-')}`;
-                
-                const stateClass = `state-${event.state.toLowerCase().replace(' ', '-')}`;
-                
-                eventCard.innerHTML = `
+
+            // Sort events by creation date (newest first)
+            const sortedEvents = [...events].sort((a, b) => 
+                new Date(b.created_at) - new Date(a.created_at)
+            );
+
+            container.innerHTML = sortedEvents.map(event => `
+                <div class="event-card ${event.assignment_status}">
                     <div class="event-header">
-                        <span class="event-type">${event.ruleType}</span>
-                        <span class="state-badge ${stateClass}">${event.state}</span>
+                        <span class="event-type">${event.rule_type}</span>
+                        <span class="state-badge state-${event.assignment_status}">${event.assignment_status}</span>
                     </div>
                     <div class="event-details">
                         <p><strong>Region:</strong> ${event.region}</p>
                         <p><strong>Location:</strong> ${event.location}</p>
-                        <p><strong>Severity:</strong> ${event.severity}/5</p>
-                        <p><strong>Created:</strong> ${new Date(event.createdAt).toLocaleString()}</p>
+                        <p><strong>Severity:</strong> ${event.severity}</p>
+                        <p><strong>Created:</strong> ${new Date(event.created_at).toLocaleString()}</p>
                     </div>
                     <div class="event-metadata">
-                        <p><strong>Device ID:</strong> ${event.metadata.deviceId}</p>
-                        <p><strong>Camera ID:</strong> ${event.metadata.cameraId}</p>
-                        <p><strong>Frame:</strong> ${event.metadata.frameReference}</p>
-                        <p><strong>Event ID:</strong> ${event.eventId.substring(0, 8)}...</p>
+                        <p><strong>Device ID:</strong> ${event.device_id}</p>
+                        <p><strong>Camera ID:</strong> ${event.camera_id}</p>
+                        <p><strong>Frame Ref:</strong> ${event.frame_reference}</p>
+                        <p><strong>Event ID:</strong> ${event.event_id}</p>
                     </div>
-                `;
-                
-                // Only add action buttons if the event is not already reviewed
-                if (event.state === 'Not Viewed') {
-                    const actionsDiv = document.createElement('div');
-                    actionsDiv.className = 'event-actions';
-                    
-                    const approveBtn = document.createElement('button');
-                    approveBtn.className = 'action-btn approve-btn';
-                    approveBtn.textContent = 'Approve';
-                    approveBtn.onclick = () => updateEventState(event.region, event.eventId, 'Approved');
-                    
-                    const rejectBtn = document.createElement('button');
-                    rejectBtn.className = 'action-btn reject-btn';
-                    rejectBtn.textContent = 'Reject';
-                    rejectBtn.onclick = () => updateEventState(event.region, event.eventId, 'Rejected');
-                    
-                    actionsDiv.appendChild(approveBtn);
-                    actionsDiv.appendChild(rejectBtn);
-                    
-                    eventCard.appendChild(actionsDiv);
-                }
-                
-                eventsContainer.appendChild(eventCard);
-            });
+                    ${event.assignment_status === 'pending' ? `
+                        <div class="event-actions">
+                            <button class="action-btn approve-btn" onclick="handleEvent('${event.assignment_id}', 'approved')">Approve</button>
+                            <button class="action-btn reject-btn" onclick="handleEvent('${event.assignment_id}', 'rejected')">Reject</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
         }
-        
-        // Update event state
-        function updateEventState(region, eventId, state) {
-            fetch(`/api/events/${region}/${eventId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ state })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // The UI will be updated by the socket.io event
-                    console.log(`Event ${eventId} updated to ${state}`);
-                }
-            })
-            .catch(error => {
-                console.error('Error updating event:', error);
-            });
-        }
-        
-        // Update counts in the status bar
-        function updateCounts() {
-            let totalCount = 0;
-            let pendingCount = 0;
-            
-            for (const region in allEvents) {
-                totalCount += allEvents[region].length;
-                pendingCount += allEvents[region].filter(e => e.state === 'Not Viewed').length;
+
+        function updateStatusBar(events) {
+            if (!Array.isArray(events)) {
+                events = [];
             }
             
-            totalCountEl.textContent = totalCount;
-            pendingCountEl.textContent = pendingCount;
+            const totalCount = events.length;
+            const pendingCount = events.filter(e => e.assignment_status === 'pending').length;
+            
+            const totalElement = document.querySelector('#total-count');
+            const pendingElement = document.querySelector('#pending-count');
+            const lastUpdateElement = document.querySelector('#last-update');
+            
+            if (totalElement) totalElement.textContent = totalCount;
+            if (pendingElement) pendingElement.textContent = pendingCount;
+            if (lastUpdateElement) lastUpdateElement.textContent = new Date().toLocaleTimeString();
+        }
+
+        function startEventFetching() {
+            // Fetch immediately
+            fetchEvents();
+            
+            // Then fetch every 10 seconds
+            if (fetchInterval) {
+                clearInterval(fetchInterval);
+            }
+            fetchInterval = setInterval(fetchEvents, 10000);
+        }
+
+        async function handleEvent(assignmentId, status) {
+            try {
+                const response = await fetch(`http://localhost:3000/assignments/${assignmentId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update assignment');
+                }
+
+                // Refresh events immediately after action
+                fetchEvents();
+            } catch (error) {
+                console.error('Error handling event:', error);
+            }
         }
     </script>
 </body>

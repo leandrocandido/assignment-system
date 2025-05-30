@@ -217,12 +217,25 @@ class AssignmentService {
 
       await OutboxAssignment.create({
         assignmentId: assignment.assignmentId,
-        status
+        status: 'completed'
       }, { transaction });
 
       if (status === 'completed' || status === 'rejected') {
         // Decrement assignment count in Redis
-        await redis.hincrby('user_assignments', assignment.userId, -1);
+        
+        const userSession = await redis.get(`user:${assignment.userId}`);
+        if (userSession) {
+          const sessionData = JSON.parse(userSession);
+          sessionData.assignments = (sessionData.assignments || 0) - 1;
+  
+          await redis.setex(
+            `user:${availableUser.userId}`,
+            process.env.SESSION_TTL,
+            JSON.stringify(sessionData)
+          );
+  
+          logger.info(`Incremented assignments count for user ${availableUser.userId} to ${sessionData.assignments}`);
+        }
       }
 
       await transaction.commit();

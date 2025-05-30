@@ -261,9 +261,41 @@ To access the web interface:
 http://localhost:3001
 ```
 
-Default credentials:
-- Username: supervisor
-- Password: supervisor123
+Available Login Credentials:
+
+**Supervisors:**
+- Emma Wilson (EU)
+  - Username: emma.wilson
+  - Password: pass123
+- Sarah Connor (US)
+  - Username: sarah.connor
+  - Password: pass123
+- Raj Patel (APAC)
+  - Username: raj.patel
+  - Password: pass123
+- James Wilson (US)
+  - Username: james.wilson
+  - Password: pass123
+
+**Operators:**
+- John Smith (US)
+  - Username: john.smith
+  - Password: pass123
+- Carlos Garcia (LATAM)
+  - Username: carlos.garcia
+  - Password: pass123
+- Liu Yang (APAC)
+  - Username: liu.yang
+  - Password: pass123
+- Mike Ross (EU)
+  - Username: mike.ross
+  - Password: pass123
+- Ana Silva (LATAM)
+  - Username: ana.silva
+  - Password: pass123
+- Marie Dubois (EU)
+  - Username: marie.dubois
+  - Password: pass123
 
 ### Task Admin Service
 

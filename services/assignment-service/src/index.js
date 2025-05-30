@@ -4,8 +4,12 @@ const rabbitmq = require('../../../common/config/rabbitmq');
 const { sequelize } = require('./models');
 const assignmentService = require('./services/assignmentService');
 const redis = require('./config/redis');
+const cors = require('cors');
 
 const app = express();
+
+// Enable CORS for all routes
+app.use(cors());
 app.use(express.json());
 
 // Health check endpoint

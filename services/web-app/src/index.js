@@ -145,26 +145,6 @@ app.get('/api/events/:region', (req, res) => {
   }
 });
 
-// Get all events from all regions
-app.get('/api/events', (req, res) => {
-  try {
-    const allEvents = {};
-    
-    regions.forEach(region => {
-      const eventsFile = path.join(__dirname, '../data', region, 'events.json');
-      if (fs.existsSync(eventsFile)) {
-        allEvents[region] = JSON.parse(fs.readFileSync(eventsFile, 'utf8'));
-      } else {
-        allEvents[region] = [];
-      }
-    });
-    
-    res.json(allEvents);
-  } catch (error) {
-    console.error('Error fetching all events:', error);
-    res.status(500).json({ error: 'Failed to fetch events' });
-  }
-});
 
 // Update event state (Not Viewed/Approved/Rejected)
 app.post('/api/events/:region/:eventId', (req, res) => {
@@ -260,6 +240,53 @@ app.get('/api/users/logged', authMiddleware, async (req, res) => {
     console.error('Error fetching logged users:', error);
     res.status(500).json({ error: 'Failed to fetch logged users' });
   }
+});
+
+// Events endpoint
+app.get('/api/events', async (req, res) => {
+    console.log('GET /api/events called');
+    console.log('Query params:', req.query);
+    console.log('User ID from query:', req.query.userId);
+
+    const userId = req.query.userId;
+    if (!userId) {
+        console.log('No userId provided');
+        return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const client = await pool.connect();
+    try {
+        console.log('Executing database query for userId:', userId);
+        const result = await client.query(
+            `SELECT 
+                e.event_id,
+                e.rule_type,
+                e.region,
+                e.location,
+                e.severity,
+                e.device_id,
+                e.camera_id,
+                e.frame_reference,
+                e.created_at,
+                a.assignment_id,
+                a.status as assignment_status
+             FROM assignments a
+             INNER JOIN events e ON e.event_id = a.event_id
+             WHERE a.user_id = $1 
+             AND a.status = 'pending'
+             AND a.deleted = false
+             ORDER BY e.created_at DESC`,
+            [userId]
+        );
+
+        console.log('Database query completed. Row count:', result.rowCount);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching events:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        client.release();
+    }
 });
 
 // Start the server

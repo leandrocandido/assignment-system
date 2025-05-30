@@ -131,6 +131,7 @@ class EventService {
             severity: event.severity,
             deviceId: event.deviceId,
             cameraId: event.cameraId,
+            location: event.location,
             frameReference: event.frameReference,
             timestamp: event.createdAt
           });
