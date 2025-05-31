@@ -37,6 +37,19 @@ class RedisService {
     }
   }
 
+  async setEverLoggedUser(userId) {
+    try {
+   
+      // Add user to the permanent set of logged users
+      await this.client.sadd(this.LOGGED_USERS_SET, userId);
+      
+      return true;
+    } catch (error) {
+      console.error('Error setting session:', error);
+      return false;
+    }
+  }
+
   async getSession(userId) {
     try {
       const data = await this.client.get(`user:${userId}`);
@@ -49,7 +62,10 @@ class RedisService {
 
   async removeSession(userId) {
     try {
-      await this.client.del(`user:${userId}`);
+      // Only remove the user's session key, keeping their record in ever_logged_users
+      const sessionKey = `user:${userId}`;
+      await this.client.del(sessionKey);     
+
       return true;
     } catch (error) {
       console.error('Error removing session:', error);

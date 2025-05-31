@@ -212,35 +212,57 @@ class AssignmentService {
         throw new Error(`Assignment ${assignmentId} not found`);
       }
 
+      console.log(`assignment Id ${assignmentId} changed to status ${status}`);
+
       assignment.status = status;
       await assignment.save({ transaction });
 
       await OutboxAssignment.create({
         assignmentId: assignment.assignmentId,
         status: 'completed'
-      }, { transaction });
+      }, { transaction });      
 
-      if (status === 'completed' || status === 'rejected') {
+      await transaction.commit();
+
+      if (status === 'approved' || status === 'rejected') {
         // Decrement assignment count in Redis
-        
+         
         const userSession = await redis.get(`user:${assignment.userId}`);
+
+        console.log(`trying update the cache assignments number for user ${assignment.userId}`);
+
         if (userSession) {
+          const [results] = await sequelize.query(
+            `SELECT COUNT(*) as count 
+             FROM assignments 
+             WHERE user_id = :userId 
+             AND status = 'pending' 
+             AND deleted = false`,
+          {
+              replacements: { userId: parseInt(assignment.userId) },
+              type: sequelize.QueryTypes.SELECT
+          });
+          const count = parseInt(results.count);
+                  
+          console.log(`current number of assignments ${count}`);
+
           const sessionData = JSON.parse(userSession);
-          sessionData.assignments = (sessionData.assignments || 0) - 1;
-  
+          sessionData.assignments = count;
+          
           await redis.setex(
-            `user:${availableUser.userId}`,
+            `user:${assignment.userId}`,
             process.env.SESSION_TTL,
             JSON.stringify(sessionData)
           );
   
-          logger.info(`Incremented assignments count for user ${availableUser.userId} to ${sessionData.assignments}`);
-        }
+          logger.info(`Decremented assignments count for user ${assignment.userId} to ${sessionData.assignments}`);          
+
+        }                      
       }
 
-      await transaction.commit();
       return assignment;
     } catch (error) {
+      console.log(`error updating the assigment for assignmentId ${assignmentId} msg: ${error}`);
       await transaction.rollback();
       throw error;
     }

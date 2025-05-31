@@ -366,11 +366,13 @@
 
         async function logout() {
             try {
+                console.log(`starting logout operation userId: ${currentUserId}`)
                 await fetch('/api/logout', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({ currentUserId })
                 });
 
                 // Stop event fetching

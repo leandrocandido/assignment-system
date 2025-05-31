@@ -88,13 +88,18 @@ app.post('/api/login', async (req, res) => {
 
 // Logout endpoint
 app.post('/api/logout', async (req, res) => {
-  const userId = req.headers['x-user-id'];
+  console.log(`logout received ${req.body}`);
+
+  const { currentUserId } = req.body;
   
-  if (!userId) {
+  if (!currentUserId) {
+    console.log(`No user ID provided${currentUserId}`);
     return res.status(400).json({ error: 'No user ID provided' });
   }
 
-  await redisService.removeSession(userId);
+  await redisService.removeSession(currentUserId);
+
+  await redisService.setEverLoggedUser(currentUserId);
   res.json({ success: true });
 });
 
