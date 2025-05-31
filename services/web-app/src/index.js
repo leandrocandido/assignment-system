@@ -98,8 +98,6 @@ app.post('/api/logout', async (req, res) => {
   }
 
   await redisService.removeSession(currentUserId);
-
-  await redisService.setEverLoggedUser(currentUserId);
   res.json({ success: true });
 });
 

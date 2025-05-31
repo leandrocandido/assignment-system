@@ -37,19 +37,6 @@ class RedisService {
     }
   }
 
-  async setEverLoggedUser(userId) {
-    try {
-   
-      // Add user to the permanent set of logged users
-      await this.client.sadd(this.LOGGED_USERS_SET, userId);
-      
-      return true;
-    } catch (error) {
-      console.error('Error setting session:', error);
-      return false;
-    }
-  }
-
   async getSession(userId) {
     try {
       const data = await this.client.get(`user:${userId}`);
@@ -64,8 +51,8 @@ class RedisService {
     try {
       // Only remove the user's session key, keeping their record in ever_logged_users
       const sessionKey = `user:${userId}`;
-      await this.client.del(sessionKey);     
-
+      await this.client.del(sessionKey);
+      
       return true;
     } catch (error) {
       console.error('Error removing session:', error);
@@ -83,22 +70,13 @@ class RedisService {
     }
   }
 
-  // Methods for managing the permanent set of logged users
+  // Method used by the supervisor dashboard
   async getLoggedUsers() {
     try {
       return await this.client.smembers(this.LOGGED_USERS_SET);
     } catch (error) {
       console.error('Error getting logged users:', error);
       return [];
-    }
-  }
-
-  async isUserEverLoggedIn(userId) {
-    try {
-      return await this.client.sismember(this.LOGGED_USERS_SET, userId);
-    } catch (error) {
-      console.error('Error checking if user ever logged in:', error);
-      return false;
     }
   }
 }
