@@ -2,6 +2,10 @@
 
 This system provides an integrated solution for managing assignments and events across multiple services. It includes a web interface for user interaction and background services for task management.
 
+## System Documentation
+
+For a detailed overview of the system architecture and design decisions, please refer to our [System Solution Presentation](https://docs.google.com/presentation/d/1IaJdsvRjmJMUoLEk54yFs221DifUqluchqmU18xppRc/edit?usp=sharing).
+
 ## Architecture Overview
 
 The system is comprised of four main services:
