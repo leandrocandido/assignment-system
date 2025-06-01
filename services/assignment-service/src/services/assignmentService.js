@@ -1,4 +1,4 @@
-const { DedupEvent, Event, Assignment, OutboxAssignment, sequelize } = require('../models');
+const { Event, Assignment, OutboxAssignment, sequelize } = require('../models');
 const redis = require('../config/redis');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
@@ -9,9 +9,10 @@ const DEFAULT_MAX_ASSIGNMENTS = 50;
 const DEFAULT_SESSION_TTL = 300;
 
 class AssignmentService {
-  constructor() {   
+  constructor(eventRepository) {   
     this.MAX_ASSIGNMENTS = parseInt(process.env.MAX_ASSIGNMENTS || DEFAULT_MAX_ASSIGNMENTS);
     this.SESSION_TTL = parseInt(process.env.SESSION_TTL || DEFAULT_SESSION_TTL);
+    this.eventRepository = eventRepository;
     
     logger.info('AssignmentService Configuration:', {
       MAX_ASSIGNMENTS: this.MAX_ASSIGNMENTS,
@@ -60,13 +61,10 @@ class AssignmentService {
     const transaction = await sequelize.transaction();
     console.log('Processing event:', eventData);
     try {
-      // Check if event already exists
-      const existingEvent = await DedupEvent.findOne({
-        where: { eventId: eventData.eventId },
-        transaction
-      });
+      // Check if event already exists using repository
+      const isDuplicate = await this.eventRepository.isDuplicate(eventData.eventId);
 
-      if (existingEvent) {
+      if (isDuplicate) {
         console.log(`Event ${eventData.eventId} already processed`);
         await transaction.commit();
         return;
@@ -81,21 +79,16 @@ class AssignmentService {
         return;
       }
 
-      // Create dedup event
-      await DedupEvent.create({
-        eventId: eventData.eventId
-      }, { transaction });
+      // Mark event as processed using repository
+      await this.eventRepository.markEventAsProcessed(eventData.eventId);
 
       // Check if event exists in events table
-      const existingEventRecord = await Event.findOne({
-        where: { eventId: eventData.eventId },
-        transaction
-      });
+      const eventExists = await this.eventRepository.eventExists(eventData.eventId);
 
       // Only create event if it doesn't exist
-      if (!existingEventRecord) {
-        await Event.create({
-          eventId: eventData.eventId,
+      if (!eventExists) {
+        const event = {
+          id: eventData.eventId,
           region: eventData.region,
           ruleType: eventData.ruleType,
           location: eventData.location,
@@ -103,8 +96,10 @@ class AssignmentService {
           deviceId: eventData.deviceId,
           cameraId: eventData.cameraId,
           frameReference: eventData.frameReference
-        }, { transaction });
+        };
+        await this.eventRepository.saveEvent(event);
       }     
+
       // Create assignment
       const assignment = await Assignment.create({
         userId: availableUser.userId,
@@ -113,7 +108,6 @@ class AssignmentService {
       }, { transaction });
 
       await transaction.commit();
-
 
       // Increment assignment count in Redis
       // Get current session data
@@ -139,7 +133,7 @@ class AssignmentService {
     }
   }
 
-  async findAvailableUser() {
+  async findAvailableUser() {   
     try {
       // Get users from ever_logged_users set
       const everLoggedUsers = await redis.smembers('ever_logged_users');
@@ -344,4 +338,4 @@ class AssignmentService {
   }
 }
 
-module.exports = new AssignmentService(); 
+module.exports = AssignmentService; 

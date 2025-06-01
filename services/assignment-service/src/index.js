@@ -2,15 +2,29 @@ require('dotenv').config();
 const express = require('express');
 const rabbitmq = require('../../../common/config/rabbitmq');
 const { sequelize } = require('./models');
-const assignmentService = require('./services/assignmentService');
+const AssignmentService = require('./services/assignmentService');
 const redis = require('./config/redis');
 const cors = require('cors');
+const RabbitMQService = require('./infrastructure/messaging/RabbitMQService');
+const RedisUserRepository = require('./infrastructure/persistence/RedisUserRepository');
+const PostgresEventRepository = require('./infrastructure/persistence/PostgresEventRepository');
+const PostgresAssignmentRepository = require('./infrastructure/persistence/PostgresAssignmentRepository');
+const ConsumeEventsUseCase = require('./application/use-cases/ConsumeEventsUseCase');
+const logger = require('./shared/utils/logger');
 
 const app = express();
 
 // Enable CORS for all routes
 app.use(cors());
 app.use(express.json());
+
+// Initialize repositories
+const userRepository = new RedisUserRepository();
+const eventRepository = new PostgresEventRepository();
+const assignmentRepository = new PostgresAssignmentRepository();
+
+// Initialize services
+const assignmentService = new AssignmentService(eventRepository);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -94,89 +108,46 @@ app.put('/assignments/:assignmentId', async (req, res) => {
   }
 });
 
-async function setupMessageConsumer() {
-  try {
-    await rabbitmq.connect();
-
-    // Consume events from the event_assignments queue with prefetch=1
-    await rabbitmq.consumeMessages('event_assignments', async (eventData) => {
-      await assignmentService.processEvent(eventData);
-    }, { prefetch: 1, requeue: false });
-
-    console.log('RabbitMQ consumer setup complete');
-  } catch (error) {
-    console.error('Error setting up RabbitMQ consumer:', error);
-    // Don't exit the process, let it retry
-    setTimeout(setupMessageConsumer, 5000);
-  }
-}
-
 async function startServer() {
   try {
-    // Test database connection
-    await sequelize.authenticate();
-    console.log('Database connection established');
+    // Initialize message queue
+    const messageQueue = new RabbitMQService();
+    await messageQueue.connect();
+    logger.info('Connected to RabbitMQ');
 
-    // Sync assignment counts on startup
-    try {
-      await assignmentService.syncAssignmentCounts();
-      console.log('Initial assignment count sync completed');
-    } catch (error) {
-      console.error('Error during initial assignment count sync:', error);
-    }
+    // Initialize use cases
+    const consumeEventsUseCase = new ConsumeEventsUseCase(
+      messageQueue,
+      userRepository,
+      eventRepository,
+      assignmentRepository
+    );
 
-    // Start the express server
+    // Start consuming events
+    await consumeEventsUseCase.execute();
+    logger.info('Assignment service started successfully');
+
+    // Start HTTP server
     const port = process.env.PORT || 3000;
-    const server = app.listen(port, () => {
-      console.log(`Server listening on port ${port}`);
+    app.listen(port, () => {
+      logger.info(`HTTP server listening on port ${port}`);
     });
 
-    // Setup message consumer
-    await setupMessageConsumer();
-
-    // Setup periodic sync (every 5 minutes)
-    setInterval(async () => {
-      try {
-        await assignmentService.syncAssignmentCounts();
-        console.log('Periodic assignment count sync completed');
-      } catch (error) {
-        console.error('Error during periodic assignment count sync:', error);
-      }
-    }, 5 * 60 * 1000); // 5 minutes
-
-    // Graceful shutdown
-    process.on('SIGTERM', gracefulShutdown);
-    process.on('SIGINT', gracefulShutdown);
-
-    async function gracefulShutdown() {
-      console.log('Received shutdown signal');
-      
-      // Close the HTTP server
-      server.close(() => {
-        console.log('HTTP server closed');
-      });
-
-      // Close RabbitMQ connection
-      try {
-        await rabbitmq.close();
-        console.log('RabbitMQ connection closed');
-      } catch (err) {
-        console.error('Error closing RabbitMQ connection:', err);
-      }
-
-      // Close database connection
-      try {
-        await sequelize.close();
-        console.log('Database connection closed');
-      } catch (err) {
-        console.error('Error closing database connection:', err);
-      }
-
+    // Handle graceful shutdown
+    process.on('SIGTERM', async () => {
+      logger.info('SIGTERM signal received');
+      await messageQueue.close();
       process.exit(0);
-    }
+    });
+
+    process.on('SIGINT', async () => {
+      logger.info('SIGINT signal received');
+      await messageQueue.close();
+      process.exit(0);
+    });
 
   } catch (error) {
-    console.error('Error starting server:', error);
+    logger.error('Error starting assignment service:', error);
     process.exit(1);
   }
 }

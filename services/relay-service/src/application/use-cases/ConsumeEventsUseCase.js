@@ -10,14 +10,23 @@ class ConsumeEventsUseCase {
   async execute() {
     try {
       await this.messageQueue.consumeEvents(this.queueName, async (message) => {
-        const { eventId, state } = message;
+
+
+        console.log(`message from inbound queue ${message}`);
+
+        const { eventId, assignmentId } = message;
         
-        if (!eventId || !state) {
+        if (!eventId || !assignmentId) {
           throw new Error('Invalid message format');
         }
 
-        await this.eventRepository.updateEventState(eventId, state);
-        logger.info(`Updated event ${eventId} state to ${state}`);
+        await this.eventRepository.updateEventState(eventId, 'Viewed');
+        logger.info(`Updated event ${eventId} state to Viewed`);
+
+        // Publish message to acknowledgment queue
+        await this.messageQueue.publishEventToQueue('ack.queue', message);
+        logger.info(`Published message to ack.queue: ${JSON.stringify(message)}`);
+
       });
     } catch (error) {
       logger.error('Error in consume events use case:', error);

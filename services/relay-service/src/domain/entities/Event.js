@@ -1,6 +1,6 @@
 class Event {
   constructor(id, state, ruleType, region, location, severity, deviceId, cameraId, frameReference, createdAt) {
-    this.id = id;
+    this.eventId = id;
     this.state = state;
     this.ruleType = ruleType;
     this.region = region;
@@ -22,7 +22,7 @@ class Event {
 
   toJSON() {
     return {
-      id: this.id,
+      eventId: this.eventId,
       state: this.state,
       ruleType: this.ruleType,
       region: this.region,

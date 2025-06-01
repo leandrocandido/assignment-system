@@ -11,6 +11,10 @@ class IMessageQueue {
     throw new Error('Method not implemented');
   }
 
+  async publishEventToQueue(queue, event) {
+    throw new Error('Method not implemented');
+  }
+
   async consumeEvents(queueName, handler) {
     throw new Error('Method not implemented');
   }

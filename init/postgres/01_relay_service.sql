@@ -3,7 +3,6 @@
 
 -- Create events table
 CREATE TABLE IF NOT EXISTS events (
-    id SERIAL,
     event_id UUID PRIMARY KEY,
     region VARCHAR(100) NOT NULL,
     rule_type VARCHAR(100) NOT NULL,

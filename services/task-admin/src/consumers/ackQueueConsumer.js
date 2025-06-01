@@ -28,7 +28,7 @@ class AckQueueConsumer {
                 if (msg !== null) {
                     try {
                         const content = JSON.parse(msg.content.toString());
-                        const { assignmentId } = content;
+                        const { assignmentId , eventId } = content;
 
                         const client = await this.pool.connect();
                         try {

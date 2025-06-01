@@ -11,10 +11,11 @@ class PostgresEventRepository extends IEventRepository {
     this.sequelize = sequelize;
     
     EventModel.init({
-      id: {
+      eventId: {
         type: DataTypes.UUID,
         defaultValue: Sequelize.UUIDV4,
-        primaryKey: true
+        primaryKey: true,
+        field: "event_id"
       },
       state: {
         type: DataTypes.STRING,
@@ -23,7 +24,8 @@ class PostgresEventRepository extends IEventRepository {
       },
       ruleType: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
+        field: "rule_type"
       },
       region: {
         type: DataTypes.STRING,
@@ -39,15 +41,18 @@ class PostgresEventRepository extends IEventRepository {
       },
       deviceId: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
+        field: 'device_id'
       },
       cameraId: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
+        field: 'camera_id'
       },
       frameReference: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
+        field: 'frame_reference'
       }
     }, {
       sequelize,
@@ -69,7 +74,7 @@ class PostgresEventRepository extends IEventRepository {
       });
 
       return events.map(event => new Event(
-        event.id,
+        event.eventId,
         event.state,
         event.ruleType,
         event.region,
@@ -90,7 +95,7 @@ class PostgresEventRepository extends IEventRepository {
     try {
       const [updatedRows] = await EventModel.update(
         { state },
-        { where: { id: eventId } }
+        { where: { eventId: eventId } }
       );
       return updatedRows > 0;
     } catch (error) {
@@ -103,7 +108,7 @@ class PostgresEventRepository extends IEventRepository {
     try {
       const savedEvent = await EventModel.create(event.toJSON());
       return new Event(
-        savedEvent.id,
+        savedEvent.eventId,
         savedEvent.state,
         savedEvent.ruleType,
         savedEvent.region,

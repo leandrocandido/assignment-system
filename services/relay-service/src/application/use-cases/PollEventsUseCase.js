@@ -16,7 +16,7 @@ class PollEventsUseCase {
       for (const event of pendingEvents) {
         if (event.isViewable()) {
           await this.messageQueue.publishEvent(event);
-          logger.info(`Published event ${event.id} to queue`);
+          logger.info(`Published event ${event.eventId} to queue`);
         }
       }
     } catch (error) {

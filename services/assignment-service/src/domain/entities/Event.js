@@ -1,6 +1,6 @@
 class Event {
-  constructor(id, state, ruleType, region, location, severity, deviceId, cameraId, frameReference, createdAt) {
-    this.id = id;
+  constructor(eventId, state, ruleType, region, location, severity, deviceId, cameraId, frameReference, createdAt) {
+    this.eventId = eventId
     this.state = state;
     this.ruleType = ruleType;
     this.region = region;
@@ -16,13 +16,9 @@ class Event {
     return this.state === 'Not Viewed';
   }
 
-  markAsAssigned() {
-    this.state = 'Assigned';
-  }
-
   toJSON() {
     return {
-      id: this.id,
+      eventId: this.eventId,
       state: this.state,
       ruleType: this.ruleType,
       region: this.region,

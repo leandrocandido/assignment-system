@@ -54,6 +54,26 @@ class RabbitMQService extends IMessageQueue {
     }
   }
 
+  async publishEventToQueue(queue, event) {
+    try {
+
+      const message = JSON.stringify(event);
+      
+      console.log(`queue name to be published ${queue} message: ${message}`)
+
+      if (!this.channel) {
+        throw new Error('RabbitMQ channel not initialized');
+      }     
+      await this.channel.assertQueue(queue, { durable: true });
+            
+      this.channel.sendToQueue(queue, Buffer.from(message));
+      logger.info(`Published event to queue ${queue}`);
+    } catch (error) {
+      logger.error('Error publishing event:', error);
+      throw error;
+    }
+  }
+
   async consumeEvents(queueName, handler) {
     try {
       if (!this.channel) {
