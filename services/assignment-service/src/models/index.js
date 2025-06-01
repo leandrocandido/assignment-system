@@ -16,7 +16,6 @@ const sequelize = new Sequelize(
 // Define models
 const Event = require('./event')(sequelize);
 const Assignment = require('./assignment')(sequelize);
-const DedupEvent = require('./dedupEvent')(sequelize);
 const OutboxAssignment = require('./outboxAssignment')(sequelize);
 
 // Define associations based on actual database schema
@@ -52,6 +51,5 @@ module.exports = {
   sequelize,
   Event,
   Assignment,
-  DedupEvent,
   OutboxAssignment
 }; 

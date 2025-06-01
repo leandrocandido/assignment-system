@@ -1,35 +1,46 @@
 require('dotenv').config();
-const { sequelize } = require('./models');
-const { rabbitmq } = require('@relay-service/common');
-const eventService = require('./services/eventService');
-const schedulerService = require('./services/schedulerService');
-const eventInboundConsumer = require('./consumers/eventInboundConsumer');
-const logger = require('./utils/logger');
+const { Sequelize } = require('sequelize');
+const dbConfig = require('./infrastructure/config/database');
+const logger = require('./shared/utils/logger');
+
+const PostgresEventRepository = require('./infrastructure/persistence/PostgresEventRepository');
+const RabbitMQService = require('./infrastructure/messaging/RabbitMQService');
+const PollEventsUseCase = require('./application/use-cases/PollEventsUseCase');
+const ConsumeEventsUseCase = require('./application/use-cases/ConsumeEventsUseCase');
 
 async function startServer() {
   try {
-    // Connect to PostgreSQL
+    // Initialize database
+    const sequelize = new Sequelize(dbConfig);
     await sequelize.authenticate();
     logger.info('Connected to PostgreSQL database');
 
+    // Initialize dependencies
+    const eventRepository = new PostgresEventRepository(sequelize);
+    const messageQueue = RabbitMQService;
+    
     // Connect to RabbitMQ
-    await rabbitmq.connect();
+    await messageQueue.connect();
     logger.info('Connected to RabbitMQ');
 
+    // Initialize use cases
+    const pollEventsUseCase = new PollEventsUseCase(eventRepository, messageQueue);
+    const consumeEventsUseCase = new ConsumeEventsUseCase(eventRepository, messageQueue);
+
     // Start event polling
-    await eventService.startEventPolling();
-    //await schedulerService.scheduleEventProcessing(process.env.CRON_EXPRESSION);
+    const cronExpression = process.env.CRON_EXPRESSION || '*/15 * * * * *';
+    pollEventsUseCase.startPolling(cronExpression);
     logger.info('Event polling started');
 
-    // Start event inbound consumer
-    await eventInboundConsumer.start();
-    logger.info('Event inbound consumer started');
+    // Start event consumer
+    await consumeEventsUseCase.execute();
+    logger.info('Event consumer started');
 
     // Handle shutdown gracefully
     process.on('SIGTERM', async () => {
       logger.info('Received SIGTERM. Shutting down gracefully...');
-      await eventService.stopEventPolling();
-      await rabbitmq.close();
+      pollEventsUseCase.stopPolling();
+      await messageQueue.close();
       await sequelize.close();
       process.exit(0);
     });
