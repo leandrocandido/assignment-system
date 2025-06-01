@@ -4,7 +4,7 @@ A distributed system for processing and assigning events to users, built with No
 
 ## System Architecture
 
-The system consists of two main services:
+The system is comprised of four main services:
 
 ### 1. Relay Service
 - Polls PostgreSQL for new events
@@ -19,6 +19,28 @@ The system consists of two main services:
 - Implements user session tracking (5-minute TTL)
 - Enforces maximum 50 assignments per user limit
 - Only assigns to active/logged-in users
+
+### 3. TaskFlow Service (Task Admin)
+- Manages background jobs and scheduled tasks
+- Handles expired assignments
+- Processes completed assignments
+- Manages user inactivity cleanup
+
+### 4. Web Application
+- Provides user interface for operators and supervisors
+- Handles user authentication and session management
+- Displays real-time assignment updates
+- Manages user interactions and event processing
+
+### Architecture Diagram
+
+![System Architecture](docs/images/architecture.png)
+
+The above diagram illustrates the system's microservices architecture and data flow:
+- The Relay Service polls the database for new events and publishes them to RabbitMQ
+- The Assignment Service processes these events and manages user assignments using Redis
+- The TaskFlow Service handles background processing and verification
+- The Web Application provides the user interface and interacts with the services through an API gateway
 
 ## Prerequisites
 
