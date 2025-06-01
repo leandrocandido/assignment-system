@@ -70,7 +70,7 @@ class RedisUserRepository extends IUserRepository {
       }
 
       const user = JSON.parse(userData);
-      user.assignmentCount = count;
+      user.assignments = count;
       await this.redis.set(`user:${userId}`, JSON.stringify(user));
     } catch (error) {
       logger.error(`Error updating assignment count for user ${userId}:`, error);

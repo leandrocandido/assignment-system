@@ -107,6 +107,9 @@ class PostgresAssignmentRepository extends IAssignmentRepository {
           'user_id',
           [Sequelize.fn('COUNT', Sequelize.col('assignment_id')), 'count']
         ],
+        where: {
+          status: 'pending'
+        },
         group: ['user_id']
       });
 

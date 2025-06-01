@@ -43,6 +43,8 @@ class ConsumeEventsUseCase {
             return;
           }
 
+          
+
           // Get assignment counts for active users
           const userAssignmentCounts = await this.assignmentRepository.getUserAssignmentCounts();
           

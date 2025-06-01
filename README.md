@@ -30,14 +30,65 @@ The system consists of two main services:
 
 ## Project Structure
 
+The system follows a microservices architecture with some services implementing Clean Architecture principles:
+
 ```
-relay-service/
+assignment-system/
 ├── services/
-│   ├── relay-service/      # Event polling and relay service
-│   └── assignment-service/ # Event assignment and user management
-├── init/postgres/          # Database initialization scripts
-└── docker-compose.yml      # Service orchestration
+│   ├── relay-service/           # Event polling and relay service
+│   │   ├── src/
+│   │   │   ├── domain/         # Business entities and interfaces
+│   │   │   ├── application/    # Use cases and business logic
+│   │   │   ├── infrastructure/ # External services, DB, messaging
+│   │   │   └── interfaces/     # Controllers and external APIs
+│   │   └── tests/
+│   │
+│   ├── assignment-service/      # Event assignment and user management
+│   │   ├── src/
+│   │   │   ├── domain/         # Core business rules and entities
+│   │   │   ├── application/    # Application business rules
+│   │   │   ├── infrastructure/ # Frameworks and external services
+│   │   │   └── interfaces/     # Controllers and presenters
+│   │   └── tests/
+│   │
+│   ├── task-admin/             # Admin dashboard service (Future Clean Architecture candidate)
+│   │   └── src/
+│   │
+│   └── web-app/                # User interface (Future Clean Architecture candidate)
+│       └── src/
+│
+├── init/postgres/              # Database initialization scripts
+└── docker-compose.yml         # Service orchestration
 ```
+
+### Clean Architecture Implementation
+
+The relay-service and assignment-service have been restructured to follow Clean Architecture principles:
+
+- **Domain Layer**: Contains enterprise business rules, entities, and repository interfaces
+- **Application Layer**: Houses use cases and orchestrates domain objects
+- **Infrastructure Layer**: Implements technical details (databases, messaging, etc.)
+- **Interface Layer**: Handles external communication and API endpoints
+
+This architecture provides:
+- Better separation of concerns
+- Improved testability
+- Independence from external frameworks
+- More maintainable and scalable codebase
+
+### Future Improvements
+
+The following services are candidates for Clean Architecture implementation in future updates:
+
+1. **Task Admin Service**:
+   - Planned restructuring to separate business logic from infrastructure
+   - Implementation of domain-driven design principles
+   - Better separation of concerns
+
+2. **Web App**:
+   - Future migration to a clean frontend architecture
+   - Separation of presentation logic from business rules
+   - Implementation of the presenter pattern
 
 ## Getting Started
 
