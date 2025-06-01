@@ -6,7 +6,7 @@ class PollEventsUseCase {
     this.messageQueue = messageQueue;
     this.isPolling = false;
     this.pollingTask = null;
-    this.eventLimit = parseInt(process.env.EVENT_LIMIT || '10', 10);
+    this.eventLimit = parseInt(process.env.EVENT_LIMIT || '10000', 10000);
   }
 
   async execute() {
