@@ -123,61 +123,117 @@ The following services are candidates for Clean Architecture implementation in f
 
 ## Getting Started
 
+### Setup
+
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd relay-service
+git clone https://github.com/yourusername/assignment-system.git
+cd assignment-system
 ```
 
-2. Set up environment variables:
-
-Create `.env` file in `services/relay-service/`:
-```env
-# PostgreSQL
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=relay_service
-POSTGRES_HOST=postgres
-POSTGRES_PORT=5432
-
-# RabbitMQ
-RABBITMQ_USER=guest
-RABBITMQ_PASSWORD=guest
-RABBITMQ_HOST=rabbitmq
-RABBITMQ_PORT=5672
-RABBITMQ_VHOST=/
-```
-
-Create `.env` file in `services/assignment-service/`:
-```env
-# PostgreSQL
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=assignment_service
-POSTGRES_HOST=postgres
-POSTGRES_PORT=5432
-
-# RabbitMQ
-RABBITMQ_USER=guest
-RABBITMQ_PASSWORD=guest
-RABBITMQ_HOST=rabbitmq
-RABBITMQ_PORT=5672
-RABBITMQ_VHOST=/
-
-# Redis
-REDIS_HOST=redis
-REDIS_PORT=6379
-```
-
-3. Start the services:
+2. Build and start all services:
 ```bash
-docker compose up -d
+docker compose build --no-cache && docker compose up -d
 ```
 
-4. Check service status:
+3. Verify all containers are running:
 ```bash
-docker compose ps
+docker compose ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}'
 ```
+
+You should see the following containers running:
+- assignment-system-postgres
+- assignment-system-redis
+- assignment-system-rabbitmq
+- assignment-system-assignment-service
+- assignment-system-relay-service
+- assignment-system-task-admin
+- assignment-system-web-app
+
+### Accessing the Web Application
+
+The web interface is available at: http://localhost:3001
+
+Available users (username:password):
+- emma.wilson:pass123 (EU)
+- sarah.connor:pass123 (US)
+- raj.patel:pass123 (APAC)
+- james.wilson:pass123 (US)
+- john.smith:pass123 (US)
+- carlos.garcia:pass123 (LATAM)
+- liu.yang:pass123 (APAC)
+- mike.ross:pass123 (EU)
+- ana.silva:pass123 (LATAM)
+- marie.dubois:pass123 (EU)
+
+### API Login
+
+You can also login via API using curl:
+```bash
+curl -X POST http://localhost:3001/api/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "liu.yang",
+    "password": "pass123"
+  }'
+```
+
+### Generating Test Events
+
+To generate test events, use the event generator utility:
+```bash
+# Generate 10 events (default)
+docker compose run --rm event-generator
+
+# Generate specific number of events (e.g., 100)
+docker compose run --rm event-generator 100
+```
+
+### Database Connections
+
+The system uses two separate PostgreSQL databases:
+
+1. **Relay Service Database**
+   - Database Name: relay_service
+   - Host: localhost
+   - Port: 5432
+   - Username: postgres
+   - Password: postgres
+
+2. **Assignment Service Database**
+   - Database Name: assignment_service
+   - Host: localhost
+   - Port: 5432
+   - Username: postgres
+   - Password: postgres
+
+To connect using DataGrip:
+
+1. Click "+" to add a new data source
+2. Select PostgreSQL
+3. Configure two separate connections:
+   
+   For Relay Service:
+   ```
+   Name: Relay Service DB
+   Host: localhost
+   Port: 5432
+   Database: relay_service
+   User: postgres
+   Password: postgres
+   ```
+
+   For Assignment Service:
+   ```
+   Name: Assignment Service DB
+   Host: localhost
+   Port: 5432
+   Database: assignment_service
+   User: postgres
+   Password: postgres
+   ```
+
+4. Test the connection and click "Apply"
 
 ## Event Generation
 
