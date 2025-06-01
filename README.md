@@ -1,8 +1,8 @@
-# Distributed Event Processing System
+# Assignment System
 
-A distributed system for processing and assigning events to users, built with Node.js, PostgreSQL, Redis, and RabbitMQ.
+This system provides an integrated solution for managing assignments and events across multiple services. It includes a web interface for user interaction and background services for task management.
 
-## System Architecture
+## Architecture Overview
 
 The system is comprised of four main services:
 
@@ -25,74 +25,39 @@ The system is comprised of four main services:
 - Handles expired assignments
 - Processes completed assignments
 - Manages user inactivity cleanup
+- Runs scheduled jobs:
+  - Inactive User Job (Daily at midnight)
+  - Expired Event Job (Every 2 hours)
+  - Check Reviewed Job (Every 30 minutes)
 
 ### 4. Web Application
 - Provides user interface for operators and supervisors
 - Handles user authentication and session management
 - Displays real-time assignment updates
 - Manages user interactions and event processing
+- Access at: http://localhost:3001
 
-### Architecture Diagram
+### Infrastructure Components
 
-```
-┌──────────────────┐
-│                  │
-│    PostgreSQL    │◄─────┐
-│                  │      │
-└────────┬─────────┘      │
-         │                │
-         │                │
-         ▼                │
-┌──────────────────┐     │
-│  Relay Service   │     │
-└────────┬─────────┘     │
-         │               │
-         │   ┌──────────────────┐
-         ├──►│    RabbitMQ      │
-         │   │   (Events Q)     │
-         │   └────────┬─────────┘
-         │            │
-         │            ▼
-         │   ┌──────────────────┐     ┌──────────────────┐
-         │   │   Assignment     │────►│      Redis       │
-         │   │    Service       │     └──────────────────┘
-         │   └────────┬─────────┘
-         │            │
-         │            ▼
-         │   ┌──────────────────┐
-         │   │    TaskFlow      │◄────┐
-         │   │    Service       │     │
-         │   └────────┬─────────┘     │
-         │            │               │
-         │            ▼               │
-         │   ┌──────────────────┐     │
-         └───┤    Ack Queue     │─────┘
-             └──────────────────┘
+- PostgreSQL (Port 5432)
+- Redis (Port 6379)
+- RabbitMQ (Port 5672, Management: 15672)
 
-      ┌──────────────────┐
-      │    Web App       │
-      │   (Frontend)     │
-      └────────┬─────────┘
-               │
-               ▼
-      ┌──────────────────┐
-      │   Verify API     │
-      └──────────────────┘
-```
+## Available Login Credentials
 
-The above diagram illustrates the system's microservices architecture and data flow:
-- The Relay Service polls PostgreSQL for new events and publishes them to RabbitMQ
-- The Assignment Service processes these events and manages user assignments using Redis
-- The TaskFlow Service handles background processing and verification
-- The Web Application provides the user interface and interacts with the services through the Verify API
+### Supervisors
+- Emma Wilson (EU) - emma.wilson:pass123
+- Sarah Connor (US) - sarah.connor:pass123
+- Raj Patel (APAC) - raj.patel:pass123
+- James Wilson (US) - james.wilson:pass123
 
-## Prerequisites
-
-- Docker and Docker Compose
-- Node.js 18 or higher (for local development)
-- PostgreSQL 15
-- Redis 7
-- RabbitMQ 3
+### Operators
+- John Smith (US) - john.smith:pass123
+- Carlos Garcia (LATAM) - carlos.garcia:pass123
+- Liu Yang (APAC) - liu.yang:pass123
+- Mike Ross (EU) - mike.ross:pass123
+- Ana Silva (LATAM) - ana.silva:pass123
+- Marie Dubois (EU) - marie.dubois:pass123
 
 ## Project Structure
 
@@ -343,207 +308,3 @@ The initial database schema is automatically created when the containers start u
 ## License
 
 [MIT License](LICENSE)
-
-# Assignment System
-
-This system provides an integrated solution for managing assignments and events across multiple services. It includes a web interface for user interaction and background services for task management.
-
-## Architecture Overview
-
-The system consists of multiple microservices:
-
-- Web App (Port 3001)
-- Assignment Service (Port 3000)
-- Task Admin Service
-- Relay Service
-
-### Infrastructure Components
-
-- PostgreSQL (Port 5432)
-- Redis (Port 6379)
-- RabbitMQ (Port 5672, Management: 15672)
-
-## Services Details
-
-### Web App (Port 3001)
-
-The web application is provided by Protext AI, embedded as a Docker container in our solution. We've enhanced it with:
-
-- User authentication system
-- Login form with session management
-- Real-time assignment status updates
-
-To access the web interface:
-```
-http://localhost:3001
-```
-
-Available Login Credentials:
-
-**Supervisors:**
-- Emma Wilson (EU)
-  - Username: emma.wilson
-  - Password: pass123
-- Sarah Connor (US)
-  - Username: sarah.connor
-  - Password: pass123
-- Raj Patel (APAC)
-  - Username: raj.patel
-  - Password: pass123
-- James Wilson (US)
-  - Username: james.wilson
-  - Password: pass123
-
-**Operators:**
-- John Smith (US)
-  - Username: john.smith
-  - Password: pass123
-- Carlos Garcia (LATAM)
-  - Username: carlos.garcia
-  - Password: pass123
-- Liu Yang (APAC)
-  - Username: liu.yang
-  - Password: pass123
-- Mike Ross (EU)
-  - Username: mike.ross
-  - Password: pass123
-- Ana Silva (LATAM)
-  - Username: ana.silva
-  - Password: pass123
-- Marie Dubois (EU)
-  - Username: marie.dubois
-  - Password: pass123
-
-### Task Admin Service
-
-The Task Admin service manages background jobs and processes messages from various queues.
-
-#### Jobs
-
-1. **Inactive User Job**
-   - Runs: Daily at midnight
-   - Purpose: Cleans up assignments for inactive users
-   - Actions: 
-     - Marks assignments as deleted
-     - Removes events from dedup_events
-     - Updates Redis user tracking
-
-2. **Expired Event Job**
-   - Runs: Every 2 hours
-   - Purpose: Handles expired assignments
-   - Actions:
-     - Processes assignments older than 15 minutes
-     - Updates user assignment counts in Redis
-
-3. **Check Reviewed Job**
-   - Runs: Every 30 minutes
-   - Purpose: Processes completed assignments
-   - Actions:
-     - Identifies non-pending assignments
-     - Creates outbox entries
-     - Produces messages to events.inbound queue
-
-#### Message Queue Processing
-
-**Consumes:**
-- ack.queue
-  - Purpose: Updates assignment status after event processing
-  - Actions: Updates outbox_assignments status to 'finished'
-
-**Produces:**
-- events.inbound
-  - Content: { assignmentId, eventId }
-  - Purpose: Notifies about completed assignments
-
-#### Folder Structure
-```
-services/task-admin/
-├── src/
-│   ├── jobs/
-│   │   ├── checkReviewedJob.js
-│   │   ├── expiredEventJob.js
-│   │   └── inactiveUserJob.js
-│   ├── consumers/
-│   │   └── ackQueueConsumer.js
-│   ├── utils/
-│   │   └── logger.js
-│   └── index.js
-├── Dockerfile
-└── package.json
-```
-
-### Relay Service
-
-The Relay service handles event processing and status updates.
-
-#### Message Queue Processing
-
-**Consumes:**
-- events.inbound
-  - Purpose: Processes completed assignments
-  - Actions: 
-    - Updates event state to 'viewed'
-    - Forwards to ack.queue
-
-**Produces:**
-- ack.queue
-  - Content: { assignmentId, eventId }
-  - Purpose: Confirms event processing
-
-## Getting Started
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-```
-
-2. Create necessary .env files (examples provided in .env.example)
-
-3. Start the services:
-```bash
-docker-compose up -d
-```
-
-4. Access the web interface:
-```
-http://localhost:3001
-```
-
-## Environment Variables
-
-Each service has its own environment variables. Key variables include:
-
-```env
-# Database
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=assignment_service
-
-# Redis
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-# RabbitMQ
-RABBITMQ_URL=amqp://rabbitmq:5672
-
-# Job Schedules
-INACTIVE_USER_CRON="0 0 * * *"
-EXPIRED_EVENT_CRON="0 */2 * * *"
-CHECK_REVIEWED_CRON="*/30 * * * *"
-```
-
-## Monitoring
-
-- RabbitMQ Management: http://localhost:15672
-  - Username: guest
-  - Password: guest
-
-## Development
-
-To run services individually for development:
-
-```bash
-cd services/<service-name>
-npm install
-npm run dev
-```
