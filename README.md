@@ -34,13 +34,57 @@ The system is comprised of four main services:
 
 ### Architecture Diagram
 
-![System Architecture](docs/images/architecture.png)
+```
+┌──────────────────┐
+│                  │
+│    PostgreSQL    │◄─────┐
+│                  │      │
+└────────┬─────────┘      │
+         │                │
+         │                │
+         ▼                │
+┌──────────────────┐     │
+│  Relay Service   │     │
+└────────┬─────────┘     │
+         │               │
+         │   ┌──────────────────┐
+         ├──►│    RabbitMQ      │
+         │   │   (Events Q)     │
+         │   └────────┬─────────┘
+         │            │
+         │            ▼
+         │   ┌──────────────────┐     ┌──────────────────┐
+         │   │   Assignment     │────►│      Redis       │
+         │   │    Service       │     └──────────────────┘
+         │   └────────┬─────────┘
+         │            │
+         │            ▼
+         │   ┌──────────────────┐
+         │   │    TaskFlow      │◄────┐
+         │   │    Service       │     │
+         │   └────────┬─────────┘     │
+         │            │               │
+         │            ▼               │
+         │   ┌──────────────────┐     │
+         └───┤    Ack Queue     │─────┘
+             └──────────────────┘
+
+      ┌──────────────────┐
+      │    Web App       │
+      │   (Frontend)     │
+      └────────┬─────────┘
+               │
+               ▼
+      ┌──────────────────┐
+      │   Verify API     │
+      └──────────────────┘
+```
 
 The above diagram illustrates the system's microservices architecture and data flow:
-- The Relay Service polls the database for new events and publishes them to RabbitMQ
+- The Relay Service polls PostgreSQL for new events and publishes them to RabbitMQ
 - The Assignment Service processes these events and manages user assignments using Redis
 - The TaskFlow Service handles background processing and verification
-- The Web Application provides the user interface and interacts with the services through an API gateway
+- The Web Application provides the user interface and interacts with the services through the Verify API
 
 ## Prerequisites
 
